@@ -8,9 +8,9 @@ luego necesitamos tener las versiones de c++ o compilador o como quieras llamarl
 chantale este codigo
 
 
-apt-get -y update
+apt-get  update
 
-apt-get -y install build-essential
+sudo apt-get -y install build-essential
 
 luego tienes 2 opciones
 
