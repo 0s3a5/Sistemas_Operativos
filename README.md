@@ -6,7 +6,10 @@ Primero necesitamos tener el ubunut (no me jalo en kali)
 
 luego necesitamos tener las versiones de c++ o compilador o como quieras llamarlo
 chantale este codigo
+
+
 apt-get -y update
+
 apt-get -y install build-essential
 
 luego tienes 2 opciones
