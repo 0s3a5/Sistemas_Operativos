@@ -5,21 +5,24 @@
 using namespace std;
 
 int main() {
-    cout << "Inicio del programa, PID=" << getpid() << endl;
+    cout << "PID" << getpid() << endl; // se muetsra el ID del programa en c++
 
     pid_t pid = fork(); // crea un proceso hijo
-
+    // el hijo empieza desde 0
+    //el padre toma un valor distinto 
+    // casi siempre char
     if (pid < 0) {
-        perror("fork");
+        perror("fork"); // elimina los erroes
+        // si ocurre esto el proceso se ejecuto mal
         return 1;
     }
 
     if (pid == 0) {
         // Este es el hijo
-        cout << "[Hijo] PID=" << getpid() << " PPID=" << getppid() << endl;
+        cout << "PID del hijo " << getpid() << " PPID (id del padre)" << getppid() << endl;
     } else {
         // Este es el padre
-        cout << "[Padre] PID=" << getpid() << " creó hijo con PID=" << pid << endl;
+        cout << " PID" << getpid() <<  endl;
     }
 
     return 0;
