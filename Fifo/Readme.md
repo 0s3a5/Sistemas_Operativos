@@ -9,3 +9,7 @@ en cambio el pipe se comunica solo con los del mimso cpp
 para esto se crean  cpp, uno del cliente otro del servidor
 
 ya no es necesario que sean padre e hijo
+
+primero se abre el servidor
+
+despues el cliente
