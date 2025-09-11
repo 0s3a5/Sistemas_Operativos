@@ -22,66 +22,55 @@ int totalClientes = 0;
 
 int buscarReporte(pid_t pid) {
     for (int i = 0; i < totalClientes; i++) {
-        if (reportes[i].pid == pid) return i;
+        if (reportes[i].pid == pid) return i; // se busca si el proceso tiene algun reporte 
     }
-    return -1;
+    return -1;//si no tiene se devuelve el -1
 }
 
 void agregarReporte(pid_t pid) {
     int idx = buscarReporte(pid);
     if (idx == -1 && totalClientes < MAX_CLIENTS) {
-        reportes[totalClientes].pid = pid;
-        reportes[totalClientes].count = 0;
+        //si no tiene ningun reporte se crea uno
+        reportes[totalClientes].pid = pid; //se toma la posicion como pid
+        reportes[totalClientes].count = 0;// su contador de reportes empiez en 0
         idx = totalClientes;
         totalClientes++;
     }
-    reportes[idx].count++;
+    reportes[idx].count++;//como ya se reporto se le suma el reporte al proceso
 
-    cout << "[Servidor] Proceso " << pid << " tiene " << reportes[idx].count << " reportes.\n";
+    cout << " proceso " << pid << " tiene " << reportes[idx].count << " reportes"<<endl;
 
     if (reportes[idx].count >= 10) {
-        cout << "[Servidor] Proceso " << pid << " será terminado por acumulación de reportes.\n";
+        cout << "proceso " << pid << " tiene muchos reportes ban"<<endl;
         kill(pid, SIGTERM);
     }
 }
 
 int main() {
     unlink(SERVER_FIFO);
-    mkfifo(SERVER_FIFO, 0666);
+    mkfifo(SERVER_FIFO);
 
-    int fd = open(SERVER_FIFO, O_RDONLY);
+    int fd = open(SERVER_FIFO, O_RDONLY);//se deja proceso como solo de lectura
     if (fd == -1) {
-        perror("Error abriendo server_fifo");
+        perror("no se abruo el server");
         return 1;
     }
 
     char buffer[256];
-    ofstream log("chat.log", ios::app);
-
-    cout << "[Servidor] Esperando mensajes...\n";
+    cout << "prendiendo"<<endl;
 
     while (true) {
-        memset(buffer, 0, sizeof(buffer));
-        int n = read(fd, buffer, sizeof(buffer));
-        if (n > 0) {
-            buffer[n] = '\0';
-
-            // Mensajes con formato: "PID: mensaje"
-            pid_t pid;
+        
+        pid_t pid;
             char msg[200];
-            sscanf(buffer, "%d: %[^\n]", &pid, msg);
+            sscanf(buffer, "%d: %[^\n]", &pid, msg);//se lee el pid y el mensaje
 
-            // Guardar en log
-            log << "[" << pid << "] " << msg << endl;
-            log.flush();
+            cout << "pid " << pid << " mensaje " << msg << endl;
 
-            cout << "[Servidor] " << pid << ": " << msg << endl;
-
-            // Verificar si es reporte
-            if (strncmp(msg, "reportar", 8) == 0) {
+            if (strncmp(msg, "reportar", 8) == 0) {//si es un reporte
                 pid_t pidReportado;
-                sscanf(msg, "reportar %d", &pidReportado);
-                agregarReporte(pidReportado);
+                sscanf(msg, "reportar %d", &pidReportado);//se lee el pid
+                agregarReporte(pidReportado);//se envia reportado
             }
         }
     }
