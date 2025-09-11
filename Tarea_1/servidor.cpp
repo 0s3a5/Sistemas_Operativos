@@ -8,6 +8,8 @@
 #include <cstring>
 
 using namespace std;
+
+#define SERVER_FIFO "server_fifo"
 #define MAX_CLIENTS 50
 
 struct Reporte {
@@ -20,57 +22,71 @@ int totalClientes = 0;
 
 int buscarReporte(pid_t pid) {
     for (int i = 0; i < totalClientes; i++) {
-        if (reportes[i].pid == pid) return i;//busacamos cuantos reportes tiene el pid
+        if (reportes[i].pid == pid) return i;
     }
-    return -1; //si no tiene se devuelve -1
+    return -1;
 }
 
 void agregarReporte(pid_t pid) {
-    int idx = buscarReporte(pid);//si no tiene reportes se da el -1
-    if (idx == -1 && totalClientes < MAX_CLIENTS) {//al no estar creado se ve si es posible crear el cliente
-        reportes[totalClientes].pid = pid; //se le da el pid al nuevo proceso
-        reportes[totalClientes].count = 0; //su cuenta de reportes inicia en 0
+    int idx = buscarReporte(pid);
+    if (idx == -1 && totalClientes < MAX_CLIENTS) {
+        reportes[totalClientes].pid = pid;
+        reportes[totalClientes].count = 0;
         idx = totalClientes;
-        totalClientes++;// como se reporto por primera vez se le suma un reporte
+        totalClientes++;
     }
-    reportes[idx].count++;// se suma automaticamente si esta creado
+    reportes[idx].count++;
 
-    cout << "proceso " << pid << " tiene " << reportes[idx].count << " reportes"<< endl;
+    cout << "[Servidor] Proceso " << pid << " tiene " << reportes[idx].count << " reportes.\n";
 
     if (reportes[idx].count >= 10) {
-        cout << "proceso " << pid << " tiene limite de reportes "<< endl;
+        cout << "[Servidor] Proceso " << pid << " será terminado por acumulación de reportes.\n";
         kill(pid, SIGTERM);
     }
 }
 
 int main() {
-    unlink(servidor_fifo);
-    mkfifo(servidor_fifo);
-    int fd = open(servidor_fifo, O_RDONLY); // se abre proceso de solo lectura
+    unlink(SERVER_FIFO);
+    mkfifo(SERVER_FIFO, 0666);
+
+    int fd = open(SERVER_FIFO, O_RDONLY);
     if (fd == -1) {
-        perror("Error abriendo server_fifo"); // si no se creo se tira error
+        perror("Error abriendo server_fifo");
         return 1;
     }
 
     char buffer[256];
-    cout << "abierto"<< endl ;
+    ofstream log("chat.log", ios::app);
+
+    cout << "[Servidor] Esperando mensajes...\n";
 
     while (true) {
+        memset(buffer, 0, sizeof(buffer));
+        int n = read(fd, buffer, sizeof(buffer));
+        if (n > 0) {
+            buffer[n] = '\0';
+
+            // Mensajes con formato: "PID: mensaje"
             pid_t pid;
             char msg[200];
-            sscanf(buffer, "%d  %[^]", &pid, msg);//muestra el pid y mensaje
+            sscanf(buffer, "%d: %[^\n]", &pid, msg);
 
-            cout << " proceso" << pid << "mensaje " << msg << endl;
+            // Guardar en log
+            log << "[" << pid << "] " << msg << endl;
+            log.flush();
 
-            if (strncmp(msg, "reportar", 8) == 0) { //von esto llega lamsoliitud de reporte
+            cout << "[Servidor] " << pid << ": " << msg << endl;
+
+            // Verificar si es reporte
+            if (strncmp(msg, "reportar", 8) == 0) {
                 pid_t pidReportado;
-                sscanf(msg, "reportar %d", &pidReportado); //se busca cual es el pid
-                agregarReporte(pidReportado); // se reporta con la funcion de arriba
-            
-        
+                sscanf(msg, "reportar %d", &pidReportado);
+                agregarReporte(pidReportado);
+            }
+        }
     }
 
-    close(fd); //se cierra el procesp
-    unlink(servidor_fifo);
+    close(fd);
+    unlink(SERVER_FIFO);
     return 0;
 }
