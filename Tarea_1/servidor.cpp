@@ -60,7 +60,9 @@ int main() {
     cout << "prendiendo"<<endl;
 
     while (true) {
-        
+        memset(buffer, 0, sizeof(buffer));
+        int n = read(fd, buffer, sizeof(buffer));
+        if (n > 0) { buffer[n] = '\0';
         pid_t pid;
             char msg[200];
             sscanf(buffer, "%d: %[^\n]", &pid, msg);//se lee el pid y el mensaje
