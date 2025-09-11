@@ -9,7 +9,7 @@
 
 using namespace std;
 
-#define SERVER_FIFO "server_fifo"
+#define SERVIDOR_FIFO "servidor_fifo"
 #define MAX_CLIENTS 50
 
 struct Reporte {
@@ -47,10 +47,10 @@ void agregarReporte(pid_t pid) {
 }
 
 int main() {
-    unlink(SERVER_FIFO);
-    mkfifo(SERVER_FIFO);
+    unlink(SERVIDOR_FIFO);
+    mkfifo(SERVIDOR_FIFO);
 
-    int fd = open(SERVER_FIFO, O_RDONLY);//se deja proceso como solo de lectura
+    int fd = open(SERVIDOR_FIFO, O_RDONLY);//se deja proceso como solo de lectura
     if (fd == -1) {
         perror("no se abruo el server");
         return 1;
@@ -78,6 +78,6 @@ int main() {
     }
 
     close(fd);
-    unlink(SERVER_FIFO);
+    unlink(SERVIDOR_FIFO);
     return 0;
 }
