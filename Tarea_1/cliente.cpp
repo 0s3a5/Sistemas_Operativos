@@ -8,42 +8,59 @@
 
 using namespace std;
 
-#define SERVER_FIFO "server_fifo"
+#define SERVIDOR_FIFO "servidor_fifo"
 
 int main() {
-    int fd = open(SERVER_FIFO, O_WRONLY);
+    int fd = open(SERVIDOR_FIFO, O_WRONLY);
     if (fd == -1) {
         perror("No se pudo conectar al servidor");
-        return 1;
     }
-
-    pid_t pid = getpid();
-    cout << "[Cliente " << pid << "] Conectado. Puedes escribir mensajes.\n";
-    cout << "Comandos: duplicar | reportar <PID> | salir\n";
-
-    string input;
     char buffer[256];
-
+    int opcion;
     while (true) {
-        getline(cin, input);
+        cout << "selecciona opcion (solo un numero)" << endl;
+        cout << "1 escribir mensaje" << endl;
+        cout << "2 duplicar cliente" << endl;
+        cout << "3 reportar proceso" << endl;
+        cout << "4 salir";
+        cin >> opcion;
 
-        if (input == "salir") {
-            cout << "[Cliente " << pid << "] Desconectando...\n";
-            break;
-        } else if (input == "duplicar") {
-            pid_t child = fork();
-            if (child == 0) {
-                execl("./client", "./client", NULL);
-                perror("Error al duplicar");
+        if (opcion == 1) {
+            string mensaje;
+            cout << "mensaje (por favor solo una palabra) ";
+            cin >> palabra;
+
+            snprintf(buffer, sizeof(buffer), "%d: %s", pid, palabra.c_str());
+            write(fd, buffer, strlen(buffer));
+
+        } else if (opcion == 2) {
+            pid_t hijo = fork();
+            if (hijo == 0) {
+                execl(./cliente, ./cliente, NULL);
+                perror("algo salio mal :(");
                 exit(1);
             }
-            continue;
-        }
 
-        snprintf(buffer, sizeof(buffer), "%d: %s", pid, input.c_str());
-        write(fd, buffer, strlen(buffer));
+        } else if (opcion == 3) {
+            pid_t numero;
+            cout << "dar numero del pin "<< endl;
+            cout << "de preferenia que se vea en el servidor " << endl;
+            cin >> numero;
+
+            snprintf(buffer, sizeof(buffer), "%d: reportar %d", pid, numero);
+            write(fd, buffer, strlen(buffer));
+
+        } else if (opcion == 4) {
+            cout << "desconectado ";
+            break;
+
+        } else {
+            cout << "da un nuemero valido "<< endl;
+            cout << "dice del 1 al 4 genio "<<endl;
+        }
     }
 
     close(fd);
     return 0;
 }
+
