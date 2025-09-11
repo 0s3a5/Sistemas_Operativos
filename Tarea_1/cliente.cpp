@@ -15,6 +15,7 @@ int main() {
     if (fd == -1) {
         perror("No se pudo conectar al servidor");
     }
+    pid_t pid = getpid();
     char buffer[256];
     int opcion;
     while (true) {
@@ -26,7 +27,7 @@ int main() {
         cin >> opcion;
 
         if (opcion == 1) {
-            string mensaje;
+            string palabra;
             cout << "mensaje (por favor solo una palabra) ";
             cin >> palabra;
 
@@ -36,7 +37,7 @@ int main() {
         } else if (opcion == 2) {
             pid_t hijo = fork();
             if (hijo == 0) {
-                execl(./cliente, ./cliente, NULL);
+                execl("./cliente", "./cliente", NULL);
                 perror("algo salio mal :(");
                 exit(1);
             }
