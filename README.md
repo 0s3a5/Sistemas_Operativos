@@ -38,3 +38,12 @@ IMPORTANTE LEER LOS README
  aparte de que en el codigo hay mas comentarios que texto
  
  :)
+
+ para buscar que carpetas hay en el interior se ocupa ls
+
+ para ir a esa carpeta se ocupa cd nombre de la carpeta
+
+ para crear el archivo c++ se ocupa touch nombre.cpp
+
+ para editar el archivo c++ se ocupa sudo nano nombre.cpp
+ 
