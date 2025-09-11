@@ -11,7 +11,7 @@ using namespace std;
 #define SERVIDOR_FIFO "servidor_fifo"
 
 int main() {
-    int fd = open(SERVIDOR_FIFO, O_WRONLY);
+    int fd = open(SERVIDOR_FIFO, O_WRONLY); // solo se escribre en esta pipe
     if (fd == -1) {
         perror("No se pudo conectar al servidor");
     }
@@ -30,8 +30,8 @@ int main() {
             cout << "mensaje (por favor solo una palabra) ";
             cin >> palabra;
 
-            snprintf(buffer, sizeof(buffer), "%d: %s", pid, palabra.c_str());
-            write(fd, buffer, strlen(buffer));
+            snprintf(buffer, sizeof(buffer), "%d  %s", pid, palabra.c_str()); // muestra el pid y mensaje por pantalla
+            write(fd, buffer, strlen(buffer));//mandarlo al servidor, 
 
         } else if (opcion == 2) {
             pid_t hijo = fork();
@@ -47,7 +47,7 @@ int main() {
             cout << "de preferenia que se vea en el servidor " << endl;
             cin >> numero;
 
-            snprintf(buffer, sizeof(buffer), "%d: reportar %d", pid, numero);
+            snprintf(buffer, sizeof(buffer), "%d reporte %d", pid, numero);//muetsra por pantalla datos del pid y mensaje
             write(fd, buffer, strlen(buffer));
 
         } else if (opcion == 4) {
