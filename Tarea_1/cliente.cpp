@@ -31,7 +31,7 @@ int main() {
             cout << "mensaje (por favor solo una palabra) ";
             cin >> palabra;
 
-            snprintf(buffer, sizeof(buffer), "%d  %s", pid, palabra.c_str()); // muestra el pid y mensaje por pantalla
+            snprintf(buffer, sizeof(buffer), "%d:  %s", pid, palabra.c_str()); // muestra el pid y mensaje por pantalla
             write(fd, buffer, strlen(buffer));//mandarlo al servidor, 
 
         } else if (opcion == 2) {
@@ -48,7 +48,7 @@ int main() {
             cout << "de preferenia que se vea en el servidor " << endl;
             cin >> numero;
 
-            snprintf(buffer, sizeof(buffer), "%d reporte %d", pid, numero);//muetsra por pantalla datos del pid y mensaje
+            snprintf(buffer, sizeof(buffer), "%d reportar %d", pid, numero);//muetsra por pantalla datos del pid y mensaje
             write(fd, buffer, strlen(buffer));
 
         } else if (opcion == 4) {
