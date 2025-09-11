@@ -66,8 +66,8 @@ int main() {
                 pid_t pidReportado;
                 sscanf(msg, "reportar %d", &pidReportado); //se busca cual es el pid
                 agregarReporte(pidReportado); // se reporta con la funcion de arriba
-            }
-        }
+            
+        
     }
 
     close(fd); //se cierra el procesp
