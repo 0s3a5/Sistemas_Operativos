@@ -16,52 +16,36 @@ int main() {
         perror("No se pudo conectar al servidor");
     }
     pid_t pid = getpid();
+    cout << "cliente " << pid << " conectado, puedes escribir mensajes."<<endl;
+    cout<<"si escribes ahora se va a enviar como mensaje"<<endl;
+    cout << "si esribes reportar y al lado un numero de pid se reporta ese pid "<<endl;
+    cout << "Comandos: duplicar | reportar <PID> | salir"<<endl;
+
+    string input;
     char buffer[256];
-    int opcion;
     while (true) {
-        cout << "selecciona opcion (solo un numero)" << endl;
-        cout << "1 escribir mensaje" << endl;
-        cout << "2 duplicar cliente" << endl;
-        cout << "3 reportar proceso" << endl;
-        cout << "4 salir";
-        cin >> opcion;
+        getline(cin, input);
 
-        if (opcion == 1) {
-            string palabra;
-            cout << "mensaje (por favor solo una palabra) ";
-            cin >> palabra;
-
-            snprintf(buffer, sizeof(buffer), "%d:  %s", pid, palabra.c_str()); // muestra el pid y mensaje por pantalla
-            write(fd, buffer, strlen(buffer));//mandarlo al servidor, 
-
-        } else if (opcion == 2) {
-            pid_t hijo = fork();
-            if (hijo == 0) {
+        if (input == "salir") {
+            cout << "cliente " << pid << "] desconectando"<<endl;
+            break;
+        } else if (input == "duplicar") {
+            pid_t child = fork();
+            if (child == 0) {
                 execl("./cliente", "./cliente", NULL);
-                perror("algo salio mal :(");
+                perror("Error al duplicar");
                 exit(1);
             }
-
-        } else if (opcion == 3) {
-            pid_t numero;
-            cout << "dar numero del pin "<< endl;
-            cout << "de preferenia que se vea en el servidor " << endl;
-            cin >> numero;
-
-            snprintf(buffer, sizeof(buffer), "%d reportar %d", pid, numero);//muetsra por pantalla datos del pid y mensaje
-            write(fd, buffer, strlen(buffer));
-
-        } else if (opcion == 4) {
-            cout << "desconectado ";
-            break;
-
-        } else {
-            cout << "da un nuemero valido "<< endl;
-            cout << "dice del 1 al 4 genio "<<endl;
+            continue;
         }
+        //funcionamiento de snprintf necesita
+        
+        // archivo de guardado, tamaño del archivo, impresion del pid, impresion del mensaje, pid y mensaje
+        snprintf(buffer, sizeof(buffer), "%d: %s", pid, input.c_str());
+        //funcionamiento del write, se necesita
+        //el proceso para la salida, el mensaje y el tamaño del mensaje
+        write(fd, buffer, strlen(buffer));
     }
-
     close(fd);
     return 0;
 }
-
