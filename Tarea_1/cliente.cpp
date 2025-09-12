@@ -30,9 +30,9 @@ int main() {
             cout << "cliente " << pid << "] desconectando"<<endl;
             break;
         } else if (input == "duplicar") {
-            pid_t child = fork();
+            pid_t child = fork();//se crea un proceso hijo
             if (child == 0) {
-                execl("./cliente2", "./cliente2", NULL);
+                execl("./cliente2", "./cliente2", NULL);//pasa a ejecutarse como padre
                 perror("Error al duplicar");
                 exit(1);
             }
