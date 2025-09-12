@@ -14,12 +14,13 @@ g++ (compilador default) servidor.cpp (nombre del archivo ) -o servidor (nombre 
 
 se repite lo mismo para el cliente
 
-g++ cliente.cpp -o cliente
 
-paso 3 abrir servidor.cpp
+de preferencia que se ccopie esto para el cliente
 
-pas 4 abrir cliente.cpp
+ g++ cliente.cpp -o cliente
+
+paso 3 abrir servidor.cpp se hace con sudo ./servidor.cpp
+
+pas 4 abrir cliente.cpp se hace con sudo ./cliente
 
 paso 5 hacer lo que dice el programa
-
-paso 6 desinstalar linux
