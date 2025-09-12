@@ -47,8 +47,8 @@ void agregarReporte(pid_t pid) {
 }
 
 int main() {
-    unlink(SERVIDOR_FIFO);
-    mkfifo(SERVIDOR_FIFO);
+    unlink(SERVIDOR_FIFO);//se cierra todo proceso que estuviera usando el servidor
+    mkfifo(SERVIDOR_FIFO, 0666);
 
     int fd = open(SERVIDOR_FIFO, O_RDONLY);//se deja proceso como solo de lectura
     if (fd == -1) {
@@ -60,24 +60,31 @@ int main() {
     cout << "prendiendo"<<endl;
 
     while (true) {
+    //verificamos que el area a ocupar este vacio
+    //en memoria, antes no daba bien las cosas
+    //le damos un lugar en memoria, de que va a estar llenos en 
+    //este caso de 0, y el tamaño del espacio a ocupar
         memset(buffer, 0, sizeof(buffer));
         int n = read(fd, buffer, sizeof(buffer));
         if (n > 0) { buffer[n] = '\0';
         pid_t pid;
             char msg[200];
+            //se ocupa el escaner para la linea donde se da
+            //direccion de memoria, el pid y el mensaje
             sscanf(buffer, "%d: %[^\n]", &pid, msg);//se lee el pid y el mensaje
 
             cout << "pid " << pid << " mensaje " << msg << endl;
-
+            //se compara el mensaje para ver que sea un reporte
             if (strncmp(msg, "reportar", 8) == 0) {//si es un reporte
                 pid_t pidReportado;
                 sscanf(msg, "reportar %d", &pidReportado);//se lee el pid
-                agregarReporte(pidReportado);//se envia reportado
+                agregarReporte(pidReportado);//se envia el pid a la funcion reporte
+                //con esto se agrega un reporte al contador
             }
         }
     }
 
     close(fd);
-    unlink(SERVIDOR_FIFO);
+    unlink(SERVIDOR_FIFO);//se vueve a cerrar el cervidor pero ahora con todos los cambios ya hechos
     return 0;
 }
