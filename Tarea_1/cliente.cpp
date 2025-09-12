@@ -32,7 +32,7 @@ int main() {
         } else if (input == "duplicar") {
             pid_t child = fork();
             if (child == 0) {
-                execl("./cliente", "./cliente", NULL);
+                execl("./cliente2", "./cliente2", NULL);
                 perror("Error al duplicar");
                 exit(1);
             }
