@@ -41,7 +41,8 @@ int main() {
         //funcionamiento de snprintf necesita
         
         // archivo de guardado, tamaño del archivo, impresion del pid, impresion del mensaje, pid y mensaje
-        snprintf(buffer, sizeof(buffer), "%d: %s", pid, input.c_str());
+       // snprintf(buffer, sizeof(buffer), "%d: %s", pid, input.c_str());
+        cout <<"pid"<< pid <<"mensaje"<< input<<endl; 
         //funcionamiento del write, se necesita
         //el proceso para la salida, el mensaje y el tamaño del mensaje
         write(fd, buffer, strlen(buffer));
