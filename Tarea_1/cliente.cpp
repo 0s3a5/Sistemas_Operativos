@@ -27,7 +27,7 @@ int main() {
         getline(cin, input);
 
         if (input == "salir") {
-            cout << "cliente " << pid << "] desconectando"<<endl;
+            cout << "cliente " << pid << " desconectando"<<endl;
             break;
         } else if (input == "duplicar") {
             pid_t child = fork();//se crea un proceso hijo
