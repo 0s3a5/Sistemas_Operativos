@@ -32,7 +32,7 @@ int main() {
         } else if (input == "duplicar") {
             pid_t child = fork();//se crea un proceso hijo
             if (child == 0) {
-                execl("./cliente2", "./cliente2", NULL);//pasa a ejecutarse como padre
+                execl("./cliente", "./cliente", NULL);//pasa a ejecutarse como padre
                 perror("Error al duplicar");
                 exit(1);
             }
