@@ -19,6 +19,10 @@ de preferencia que se ccopie esto para el cliente
 
  g++ cliente.cpp -o cliente
 
+ y esto para servidor
+
+ g++ servidor.cpp -o servidor
+
 paso 3 abrir servidor.cpp se hace con sudo ./servidor.cpp
 
 pas 4 abrir cliente.cpp se hace con sudo ./cliente
