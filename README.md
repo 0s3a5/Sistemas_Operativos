@@ -43,6 +43,8 @@ IMPORTANTE LEER LOS README
 
  para ir a esa carpeta se ocupa cd nombre de la carpeta
 
+ si no hay carpeta y se quiere crear es mkdir nombre
+
  para crear el archivo c++ se ocupa touch nombre.cpp
 
  para editar el archivo c++ se ocupa sudo nano nombre.cpp
