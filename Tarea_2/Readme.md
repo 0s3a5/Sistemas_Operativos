@@ -27,3 +27,6 @@ el update es mi version+chatgpt para que limpie y arregle la basura de trabajo
 
 --Primero y lo mas importante se separa por funciones de threads, hasta el momento tengo 2 y son solo para 1 thread
 -- son la de mover heroe y la vista del monstruo
+
+destaco que mi codigo funciona a lo autista asi que gpt lo hizo mas entendible
+
