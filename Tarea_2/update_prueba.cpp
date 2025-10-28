@@ -72,6 +72,7 @@ void moverHeroe(Heroe &heroe, Pos ruta[]) {
 // Función: comprobar visión
 // =============================
 void comprobarVision(Monstruo &monstruo, const Heroe& heroe) {
+   lock_guard<mutex> lock(mtx); // zona crítica protegida (mapa)
     int d = abs(monstruo.pos.x - heroe.pos.x) + abs(monstruo.pos.y - heroe.pos.y);
     if (d <= monstruo.vision_range && !monstruo.active) {
         monstruo.active = true;
