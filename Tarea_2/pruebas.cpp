@@ -67,13 +67,14 @@ void imprimir_mapa() {
 void moverHeroe(Heroe &heroe, Pos ruta[], int cont) {
     //g¿hacer que cont sea el numero de movimiento
     //si el n de movimineto es lo mismo que largo de ruta llego
-        sleep(1); 
+        
         pthread_mutex_lock(&mutex_mapa);
         mapa[heroe.pos.x][heroe.pos.y] = 0;
         heroe.pos.x = ruta[cont].x;
         heroe.pos.y = ruta[cont].y;
         mapa[heroe.pos.x][heroe.pos.y] = 1;
         imprimir_mapa();
+        cout << "_________________________________" <<endl;
         pthread_mutex_unlock(&mutex_mapa);
 }
 void activar_monstruo(Monstruo &monstruo) {
@@ -111,7 +112,7 @@ int main(){
     mapa[heroe1.pos.x][heroe1.pos.y] = 1;
     mapa[monstruo1.pos.x][monstruo1.pos.y] = 2;
 
-    thread vigilante(vigilar, ref(monstruo1));
+    //thread vigilante(vigilar, ref(monstruo1));
 
     Pos ruta_heroe[] = {{0,0}, {1,0}, {2,0}, {3,0}, {4,0}, {5,0}, {6,0}, {7,0}, {8,0}, {9,0}, {10,0}, {10,1}, {10,2}, {10,3}, {10,4}, {10,5}, {10,6}, {10,7}, {10,8}, {10,9}, {10,10}};
      heroe1.path_len = sizeof(ruta_heroe) / sizeof(ruta_heroe[0]);
@@ -129,7 +130,7 @@ int main(){
     // Espera a que el hilo del monstruo termine
     
 
-    vigilante.join();
+    //vigilante.join();
     pthread_mutex_destroy(&mutex_mapa);
     return 0;
 
