@@ -19,7 +19,7 @@ codigo con modificaciones mias y hecho por mi es pruebas
 
 tareas es de gpt pero le falta mucho
 
-27/10/25 // 22:10
+*27/10/25 // 22:10
 
 para explicar que esta sucediendo decidi mejor separar las partes importantes del codigo y explicarlas
 aca unicamente voy a dejar que pruebas es la mejor version hecha y update_pruebas son cosas experimetnales 
@@ -30,3 +30,11 @@ el update es mi version+chatgpt para que limpie y arregle la basura de trabajo
 
 destaco que mi codigo funciona a lo autista asi que gpt lo hizo mas entendible
 
+*28/10/25 //00:28 update_prueba v2.0 funcional
+
+Le pase un codigo de prueba para calcular distancias y que se active el movimiento del monstruo
+la distancia esta en manhatan, que es un nombre bonito para lo clasico de siempre
+el mapa sigue siendo la zona critica, esta hecho de tal forma que se bloquee para que se muevan
+todo tiene mutex, encontre inutil el uso de semaforos
+
+--creacion de codifgo Mover_monstruo
