@@ -1,4 +1,5 @@
 void comprobarVision(Monstruo &monstruo, const Heroe& heroe) {
+    lock_guard<mutex> lock(mtx); // zona crítica protegida (mapa)
     int dx = abs(monstruo.pos.x - heroe.pos.x);
     int dy = abs(monstruo.pos.y - heroe.pos.y);
     bool en_rango = (dx <= monstruo.vision_range && dy <= monstruo.vision_range);
