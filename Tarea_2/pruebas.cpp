@@ -1,10 +1,17 @@
 #include <iostream>
-#include <vector>
 #include <cmath>
 #include <mutex>
-
 using namespace std;
 
+// =============================
+// Constantes
+// =============================
+const int FILAS = 30;
+const int COLUMNAS = 20;
+
+// =============================
+// Estructuras
+// =============================
 struct Pos {
     int x, y;
 };
@@ -23,11 +30,18 @@ struct Monstruo {
 };
 
 // =============================
-// Función: imprimir mapa
+// Variables globales
 // =============================
-void imprimirMapa(const vector<vector<int>>& mapa) {
-    for (int i = 0; i < (int)mapa.size(); i++) {
-        for (int j = 0; j < (int)mapa[0].size(); j++) {
+int mapa[FILAS][COLUMNAS];
+mutex mtx;
+
+// =============================
+// Funciones auxiliares
+// =============================
+void imprimirMapa() {
+    lock_guard<mutex> lock(mtx);
+    for (int i = 0; i < FILAS; i++) {
+        for (int j = 0; j < COLUMNAS; j++) {
             if (mapa[i][j] == 0) cout << ".";
             else if (mapa[i][j] == 1) cout << "H";
             else if (mapa[i][j] == 2) cout << "M";
@@ -40,46 +54,107 @@ void imprimirMapa(const vector<vector<int>>& mapa) {
 // =============================
 // Función: mover héroe
 // =============================
-void moverHeroe(Heroe &heroe, vector<vector<int>>& mapa, const vector<Pos>& ruta) {
+void moverHeroe(Heroe &heroe, Pos ruta[]) {
+    lock_guard<mutex> lock(mtx);
     if (heroe.path_idx < heroe.path_len) {
-        mapa[heroe.pos.x][heroe.pos.y] = 0; // limpia la posición anterior
+        mapa[heroe.pos.x][heroe.pos.y] = 0;
         heroe.pos = ruta[heroe.path_idx];
-        mapa[heroe.pos.x][heroe.pos.y] = 1; // marca nueva posición
+        mapa[heroe.pos.x][heroe.pos.y] = 1;
         heroe.path_idx++;
-
         if (heroe.path_idx >= heroe.path_len)
             heroe.reached_goal = true;
     }
 }
 
 // =============================
+// Función: comprobar visión
+// =============================
+void comprobarVision(Monstruo &monstruo, const Heroe& heroe) {
+    int d = abs(monstruo.pos.x - heroe.pos.x) + abs(monstruo.pos.y - heroe.pos.y);
+    if (d <= monstruo.vision_range && !monstruo.active) {
+        monstruo.active = true;
+        cout << "⚠️  Monstruo " << monstruo.id << " ha visto al héroe!" << endl;
+    }
+}
+
+// =============================
 // Función: mover monstruo
 // =============================
-void moverMonstruo(Monstruo &monstruo, const Heroe& heroe, vector<vector<int>>& mapa) {
-    if (!monstruo.active) return;
+void moverMonstruo(Monstruo &monstruo, const Heroe& heroe) {
+    lock_guard<mutex> lock(mtx);
 
+    int distanciaX = abs(monstruo.pos.x - heroe.pos.x);
+    int distanciaY = abs(monstruo.pos.y - heroe.pos.y);
+    int distancia = distanciaX + distanciaY;
+
+    if (distancia > monstruo.vision_range) {
+        monstruo.active = false;
+        return;
+    }
+
+    monstruo.active = true;
     mapa[monstruo.pos.x][monstruo.pos.y] = 0;
 
-    int movx = (heroe.pos.x > monstruo.pos.x) ? 1 : (heroe.pos.x < monstruo.pos.x ? -1 : 0);
-    int movy = (heroe.pos.y > monstruo.pos.y) ? 1 : (heroe.pos.y < monstruo.pos.y ? -1 : 0);
+    int dx = heroe.pos.x - monstruo.pos.x;
+    int dy = heroe.pos.y - monstruo.pos.y;
 
-    monstruo.pos.x += movx;
-    monstruo.pos.y += movy;
+    if (abs(dx) > abs(dy))
+        monstruo.pos.x += (dx > 0 ? 1 : -1);
+    else if (dy != 0)
+        monstruo.pos.y += (dy > 0 ? 1 : -1);
 
     mapa[monstruo.pos.x][monstruo.pos.y] = 2;
 }
 
 // =============================
-// Función: comprobar visión
+// NUEVA FUNCIÓN: ataque del héroe y monstruos
 // =============================
-void comprobarVision(Monstruo &monstruo, const Heroe& heroe) {
-    int dx = abs(monstruo.pos.x - heroe.pos.x);
-    int dy = abs(monstruo.pos.y - heroe.pos.y);
-    bool en_rango = (dx <= monstruo.vision_range && dy <= monstruo.vision_range);
+void ejecutarAtaques(Heroe &heroe, Monstruo monstruos[], int numMonstruos) {
+    lock_guard<mutex> lock(mtx);
 
-    if (en_rango && !monstruo.active) {
-        monstruo.active = true;
-        cout << "⚠️  Monstruo " << monstruo.id << " ha visto al héroe!" << endl;
+    // ---- Héroe ataca primero ----
+    if (!heroe.alive) return;
+
+    bool atacó = false;
+    for (int i = 0; i < numMonstruos; i++) {
+        if (!monstruos[i].alive) continue;
+
+        int dist = abs(heroe.pos.x - monstruos[i].pos.x) + abs(heroe.pos.y - monstruos[i].pos.y);
+        if (dist <= heroe.attack_range) {
+            monstruos[i].hp -= heroe.attack_damage;
+            cout << "🗡️  Héroe ataca al Monstruo " << monstruos[i].id
+                 << " (-" << heroe.attack_damage << " HP)" << endl;
+            cout << "    Monstruo " << monstruos[i].id << " queda con " << monstruos[i].hp << " HP." << endl;
+            atacó = true;
+
+            if (monstruos[i].hp <= 0) {
+                monstruos[i].alive = false;
+                cout << "💀 Monstruo " << monstruos[i].id << " ha muerto." << endl;
+            }
+            break; // héroe solo ataca una vez
+        }
+    }
+
+    if (!atacó)
+        cout << "⚔️  Héroe no tiene enemigos en rango." << endl;
+
+    // ---- Monstruos atacan luego ----
+    for (int i = 0; i < numMonstruos; i++) {
+        if (!monstruos[i].alive) continue;
+
+        int dist = abs(monstruos[i].pos.x - heroe.pos.x) + abs(monstruos[i].pos.y - heroe.pos.y);
+        if (dist <= monstruos[i].attack_range) {
+            heroe.hp -= monstruos[i].attack_damage;
+            cout << "🔥 Monstruo " << monstruos[i].id << " ataca al héroe (-"
+                 << monstruos[i].attack_damage << " HP)" << endl;
+            cout << "    Héroe queda con " << heroe.hp << " HP." << endl;
+
+            if (heroe.hp <= 0) {
+                heroe.alive = false;
+                cout << "💀 ¡El héroe ha muerto!" << endl;
+                return;
+            }
+        }
     }
 }
 
@@ -87,46 +162,72 @@ void comprobarVision(Monstruo &monstruo, const Heroe& heroe) {
 // Función principal
 // =============================
 int main() {
-    const int largo = 30;
-    const int ancho = 20;
-    vector<vector<int>> mapa(largo, vector<int>(ancho, 0));
-    mutex mutex_mapa;
+    // Inicializar mapa
+    for (int i = 0; i < FILAS; i++)
+        for (int j = 0; j < COLUMNAS; j++)
+            mapa[i][j] = 0;
 
+    // Crear héroe y monstruos
     Heroe heroe = {1, 100, 20, 1, {0, 0}, 0, 0, true, false};
-    Monstruo monstruo = {1, 100, 15, 5, 1, {10, 10}, false, true};
+    Monstruo monstruos[2] = {
+        {1, 60, 10, 5, 1, {10, 10}, false, true},
+        {2, 80, 15, 4, 1, {5, 8}, false, true}
+    };
+    const int numMonstruos = 2;
 
-    vector<Pos> ruta_heroe = {
+    // Ruta del héroe
+    Pos ruta_heroe[] = {
         {0,0}, {1,0}, {2,0}, {3,0}, {4,0}, {5,0}, {6,0}, {7,0}, {8,0}, {9,0},
         {10,0}, {10,1}, {10,2}, {10,3}, {10,4}, {10,5}, {10,6}, {10,7}, {10,8}, {10,9}, {10,10}
     };
-    heroe.path_len = (int)ruta_heroe.size();
+    heroe.path_len = sizeof(ruta_heroe)/sizeof(ruta_heroe[0]);
 
     mapa[heroe.pos.x][heroe.pos.y] = 1;
-    mapa[monstruo.pos.x][monstruo.pos.y] = 2;
+    for (int i = 0; i < numMonstruos; i++)
+        mapa[monstruos[i].pos.x][monstruos[i].pos.y] = 2;
 
     cout << "=== JUEGO INICIADO ===\n";
     cout << "Presiona 'n' + Enter para avanzar turno.\n\n";
 
     char tecla;
 
-    while (heroe.alive && monstruo.alive && !heroe.reached_goal) {
+    while (heroe.alive && !heroe.reached_goal) {
         cout << "Presiona 'n' para siguiente turno: ";
         cin >> tecla;
         if (tecla != 'n') continue;
 
-        moverHeroe(heroe, mapa, ruta_heroe);
-        comprobarVision(monstruo, heroe);
-        moverMonstruo(monstruo, heroe, mapa);
+        // --- Turno del héroe ---
+        moverHeroe(heroe, ruta_heroe);
 
-        if (monstruo.pos.x == heroe.pos.x && monstruo.pos.y == heroe.pos.y) {
-            heroe.alive = false;
-            cout << "💀 El monstruo atrapó al héroe!" << endl;
+        // --- Monstruos reaccionan ---
+        for (int i = 0; i < numMonstruos; i++) {
+            comprobarVision(monstruos[i], heroe);
+            moverMonstruo(monstruos[i], heroe);
         }
 
-        imprimirMapa(mapa);
+        // --- Ataques (héroe -> monstruos -> héroe) ---
+        ejecutarAtaques(heroe, monstruos, numMonstruos);
 
-        if (heroe.reached_goal)
+        // --- Mostrar mapa ---
+        imprimirMapa();
+
+        // --- Condiciones de fin ---
+        bool todosMuertos = true;
+        for (int i = 0; i < numMonstruos; i++)
+            if (monstruos[i].alive) todosMuertos = false;
+
+        if (heroe.reached_goal) {
             cout << "🏆 ¡El héroe ha llegado a su objetivo!" << endl;
+            break;
+        }
+        if (!heroe.alive) {
+            cout << "💀 El héroe ha sido derrotado." << endl;
+            break;
+        }
+        if (todosMuertos) {
+            cout << "🔥 ¡Todos los monstruos han sido eliminados!" << endl;
+            break;
+        }
     }
 
     cout << "\n=== JUEGO TERMINADO ===" << endl;
