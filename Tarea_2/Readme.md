@@ -46,3 +46,8 @@ cada uno quita segun corresponde
 falta agregar que funcione para muchos, la funcion esta hecha para mas de 1 monstruo pero el programa solo para 1
 
 --creacion de codigo ataque
+
+cambios a realizar
+-hacer que se cambien bien las letras en el mapa
+-que todos los monstruos se pongan en alerta y se muevan
+-verificar las posiciones (no se ven en el mapa las de heroes)
