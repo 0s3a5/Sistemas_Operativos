@@ -1,157 +1,174 @@
 #include <iostream>
-#include <thread>
+#include <cmath>
 #include <mutex>
-#include <chrono>
-#include <vector>
 
 using namespace std;
 
-struct Pos {
-    int x;
-    int y;
-};
+// =============================
+// Constantes
+// =============================
+const int FILAS = 30;
+const int COLUMNAS = 20;
 
-struct Monstruo {
-    int id;
-    int hp;
-    int attack_damage;
-    int vision_range;
-    int attack_range;
-    Pos pos;
-    bool active; // alertado / en persecución
-    bool alive;
+// =============================
+// Estructuras
+// =============================
+struct Pos {
+    int x, y;
 };
 
 struct Heroe {
-    int id;
-    int hp;
-    int attack_damage;
-    int attack_range;
+    int id, hp, attack_damage, attack_range;
     Pos pos;
-    int path_len;
-    int path_idx;
-    bool alive;
-    bool reached_goal;
+    int path_len, path_idx;
+    bool alive, reached_goal;
 };
 
-int largo = 30;
-int ancho = 20;
-int mapa[30][20] = {0};
+struct Monstruo {
+    int id, hp, attack_damage, vision_range, attack_range;
+    Pos pos;
+    bool active, alive;
+};
 
-std::mutex mutex_mapa; // mutex C++ moderno
+// =============================
+// Variables globales
+// =============================
+int mapa[FILAS][COLUMNAS]; // mapa como arreglo bidimensional
+mutex mtx; // para proteger la zona crítica
 
-void imprimir_mapa() {
-    std::lock_guard<std::mutex> lock(mutex_mapa);
-    // (Opcional) limpiar pantalla (funciona en muchos terminales)
-    // cout << "\x1B[2J\x1B[H";
-    for (int i = 0; i < largo; i++) {
-        for (int j = 0; j < ancho; j++) {
+// =============================
+// Funciones auxiliares
+// =============================
+void imprimirMapa() {
+    lock_guard<mutex> lock(mtx); // zona crítica protegida
+    for (int i = 0; i < FILAS; i++) {
+        for (int j = 0; j < COLUMNAS; j++) {
             if (mapa[i][j] == 0) cout << ".";
             else if (mapa[i][j] == 1) cout << "H";
             else if (mapa[i][j] == 2) cout << "M";
         }
         cout << "\n";
     }
+    cout << endl;
 }
 
-void activar_monstruo(Monstruo &monstruo) {
-    std::lock_guard<std::mutex> lock(mutex_mapa);
-    if (!monstruo.active) {
-        monstruo.active = true;
-        cout << "Monstruo " << monstruo.id << " activado!" << endl;
-    }
-}
-
-void vigilar(Monstruo &monstruo) {
-    while (monstruo.alive) {
-        std::this_thread::sleep_for(std::chrono::milliseconds(400)); // pausa entre chequeos
-
-        bool hero_detected = false;
-        {
-            std::lock_guard<std::mutex> lock(mutex_mapa);
-            for (int i = -monstruo.vision_range; i <= monstruo.vision_range && !hero_detected; i++) {
-                for (int j = -monstruo.vision_range; j <= monstruo.vision_range; j++) {
-                    int x = monstruo.pos.x + i;
-                    int y = monstruo.pos.y + j;
-                    if (x >= 0 && x < largo && y >= 0 && y < ancho) {
-                        if (mapa[x][y] == 1) { // héroe detectado
-                            hero_detected = true;
-                            break;
-                        }
-                    }
-                }
-            }
-        }
-
-        if (hero_detected) activar_monstruo(monstruo);
-    }
-}
-
-void moverHeroe(Heroe &heroe, const vector<Pos> &ruta) {
-    // mover un paso (si queda ruta)
-    if (heroe.path_idx >= heroe.path_len) return;
-
-    {
-        std::lock_guard<std::mutex> lock(mutex_mapa);
-        // limpiar posición anterior
-        if (heroe.pos.x >= 0 && heroe.pos.x < largo && heroe.pos.y >= 0 && heroe.pos.y < ancho) {
-            mapa[heroe.pos.x][heroe.pos.y] = 0;
-        }
-
-        // actualizar posición desde la ruta
+// =============================
+// Función: mover héroe
+// =============================
+void moverHeroe(Heroe &heroe, Pos ruta[]) {
+    lock_guard<mutex> lock(mtx); // bloquear mientras se mueve el héroe
+    if (heroe.path_idx < heroe.path_len) {
+        mapa[heroe.pos.x][heroe.pos.y] = 0; // limpia posición anterior
         heroe.pos = ruta[heroe.path_idx];
-        if (heroe.pos.x >= 0 && heroe.pos.x < largo && heroe.pos.y >= 0 && heroe.pos.y < ancho) {
-            mapa[heroe.pos.x][heroe.pos.y] = 1;
-        }
+        mapa[heroe.pos.x][heroe.pos.y] = 1; // nueva posición
+        heroe.path_idx++;
 
-        imprimir_mapa();
-        cout << "---------------------------------\n";
-    }
-
-    // incrementar índice de ruta y chequear objetivo
-    heroe.path_idx++;
-    if (heroe.path_idx >= heroe.path_len) {
-        heroe.reached_goal = true;
+        if (heroe.path_idx >= heroe.path_len)
+            heroe.reached_goal = true;
     }
 }
 
-int main() {
-    // Inicializar entidades
-    Heroe heroe1 = {1, 100, 20, 1, {0, 0}, 0, 0, true, false};
-    Monstruo monstruo1 = {1, 100, 15, 5, 1, {10, 10}, false, true};
+// =============================
+// Función: comprobar visión
+// =============================
+void comprobarVision(Monstruo &monstruo, const Heroe& heroe) {
+    int d = abs(monstruo.pos.x - heroe.pos.x) + abs(monstruo.pos.y - heroe.pos.y);
+    if (d <= monstruo.vision_range && !monstruo.active) {
+        monstruo.active = true;
+        cout << "⚠️  Monstruo " << monstruo.id << " ha visto al héroe!" << endl;
+    }
+}
 
-    // definir ruta como vector de Pos
-    vector<Pos> ruta_heroe = {
+// =============================
+// NUEVA Función: mover monstruo (la tuya)
+// =============================
+void moverMonstruo(Monstruo &monstruo, const Heroe& heroe) {
+    lock_guard<mutex> lock(mtx); // zona crítica protegida (mapa)
+
+    int distanciaX = abs(monstruo.pos.x - heroe.pos.x);
+    int distanciaY = abs(monstruo.pos.y - heroe.pos.y);
+    int distancia = distanciaX + distanciaY;
+
+    // Si el héroe está fuera del rango de visión
+    if (distancia > monstruo.vision_range) {
+        monstruo.active = false;
+        return;
+    }
+
+    monstruo.active = true; // activo mientras lo ve
+
+    // Limpiar posición anterior
+    mapa[monstruo.pos.x][monstruo.pos.y] = 0;
+
+    // Calcular diferencias de posición
+    int dx = heroe.pos.x - monstruo.pos.x;
+    int dy = heroe.pos.y - monstruo.pos.y;
+
+    // Movimiento Manhattan: se mueve en la dirección que reduce la distancia
+    if (abs(dx) > abs(dy)) {
+        monstruo.pos.x += (dx > 0 ? 1 : -1);
+    } else if (dy != 0) {
+        monstruo.pos.y += (dy > 0 ? 1 : -1);
+    }
+
+    // Actualizar posición en el mapa
+    mapa[monstruo.pos.x][monstruo.pos.y] = 2;
+}
+
+// =============================
+// Función principal
+// =============================
+int main() {
+    // Inicializar mapa
+    for (int i = 0; i < FILAS; i++)
+        for (int j = 0; j < COLUMNAS; j++)
+            mapa[i][j] = 0;
+
+    // Crear héroe y monstruo
+    Heroe heroe = {1, 100, 20, 1, {0, 0}, 0, 0, true, false};
+    Monstruo monstruo = {1, 100, 15, 5, 1, {10, 10}, false, true};
+
+    // Definir ruta del héroe (arreglo)
+    Pos ruta_heroe[] = {
         {0,0}, {1,0}, {2,0}, {3,0}, {4,0}, {5,0}, {6,0}, {7,0}, {8,0}, {9,0},
         {10,0}, {10,1}, {10,2}, {10,3}, {10,4}, {10,5}, {10,6}, {10,7}, {10,8}, {10,9}, {10,10}
     };
-    heroe1.path_len = static_cast<int>(ruta_heroe.size());
+    heroe.path_len = sizeof(ruta_heroe)/sizeof(ruta_heroe[0]);
 
-    // colocar en el mapa posiciones iniciales
-    {
-        std::lock_guard<std::mutex> lock(mutex_mapa);
-        if (heroe1.pos.x >= 0 && heroe1.pos.x < largo && heroe1.pos.y >= 0 && heroe1.pos.y < ancho)
-            mapa[heroe1.pos.x][heroe1.pos.y] = 1;
-        if (monstruo1.pos.x >= 0 && monstruo1.pos.x < largo && monstruo1.pos.y >= 0 && monstruo1.pos.y < ancho)
-            mapa[monstruo1.pos.x][monstruo1.pos.y] = 2;
+    // Colocar héroe y monstruo en el mapa
+    mapa[heroe.pos.x][heroe.pos.y] = 1;
+    mapa[monstruo.pos.x][monstruo.pos.y] = 2;
+
+    cout << "=== JUEGO INICIADO ===\n";
+    cout << "Presiona 'n' + Enter para avanzar turno.\n\n";
+
+    char tecla;
+
+    while (heroe.alive && monstruo.alive && !heroe.reached_goal) {
+        cout << "Presiona 'n' para siguiente turno: ";
+        cin >> tecla;
+        if (tecla != 'n') continue;
+
+        // --- Turno del héroe ---
+        moverHeroe(heroe, ruta_heroe);
+
+        // --- Turno del monstruo ---
+        comprobarVision(monstruo, heroe);
+        moverMonstruo(monstruo, heroe);
+
+        // --- Verificar colisión ---
+        if (monstruo.pos.x == heroe.pos.x && monstruo.pos.y == heroe.pos.y) {
+            heroe.alive = false;
+            cout << "💀 El monstruo atrapó al héroe!" << endl;
+        }
+
+        // --- Mostrar mapa ---
+        imprimirMapa();
+
+        if (heroe.reached_goal)
+            cout << "🏆 ¡El héroe ha llegado a su objetivo!" << endl;
     }
 
-    // lanzar hilo vigilante del monstruo
-    std::thread vigilante(vigilar, std::ref(monstruo1));
-
-    // loop de movimiento del héroe
-    while (heroe1.alive && !heroe1.reached_goal) {
-        moverHeroe(heroe1, ruta_heroe);
-        std::this_thread::sleep_for(std::chrono::milliseconds(300)); // velocidad del héroe
-    }
-
-    if (heroe1.reached_goal) {
-        cout << "El héroe ha llegado a su objetivo!" << endl;
-    }
-
-    // terminar el hilo del monstruo limpiamente
-    monstruo1.alive = false;
-    if (vigilante.joinable()) vigilante.join();
-
+    cout << "\n=== JUEGO TERMINADO ===" << endl;
     return 0;
 }
