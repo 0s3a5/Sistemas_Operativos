@@ -38,3 +38,11 @@ el mapa sigue siendo la zona critica, esta hecho de tal forma que se bloquee par
 todo tiene mutex, encontre inutil el uso de semaforos
 
 --creacion de codifgo Mover_monstruo
+
+*28/10/25 00:52 prueba v2.0 funcional 
+
+me simplifico 2 funciones que habia hecho, me junto funciones de ataque de heroe y monstruo en uno solo
+cada uno quita segun corresponde
+falta agregar que funcione para muchos, la funcion esta hecha para mas de 1 monstruo pero el programa solo para 1
+
+--creacion de codigo ataque
