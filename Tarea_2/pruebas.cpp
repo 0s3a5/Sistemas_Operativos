@@ -268,17 +268,34 @@ void* hiloHeroe(void*) {
 // =============================
 void* hiloMonstruo(void* arg) {
     int idx = *((int*)arg);
-    while (juego_activo && monstruos[idx].alive && heroe.alive) {
+    while (juego_activo && heroe.alive) {
         sem_wait(&sem_monstruos[idx]);
         if (!juego_activo) break;
 
-        moverMonstruo(monstruos[idx]);
-        atacarMonstruo(monstruos[idx]);
+        if (monstruos[idx].alive) {
+            moverMonstruo(monstruos[idx]);
+            atacarMonstruo(monstruos[idx]);
+        }
 
-        if (idx == 2) sem_post(&sem_heroe);
+        // Verifica si todos los monstruos ya terminaron su turno
+        bool todos_listos = true;
+        for (int i = 0; i < 3; ++i) {
+            int val;
+            sem_getvalue(&sem_monstruos[i], &val);
+            if (val == 0 && (monstruos[i].alive || !heroe.alive)) {
+                todos_listos = false;
+                break;
+            }
+        }
+
+        // Si todos actuaron, el héroe puede jugar nuevamente
+        if (todos_listos) {
+            sem_post(&sem_heroe);
+        }
     }
     return nullptr;
 }
+
 
 // =============================
 // MAIN
