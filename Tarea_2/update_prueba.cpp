@@ -69,17 +69,23 @@ inline int distanciaManhattan(const Pos &a, const Pos &b) {
 void comprobarVision(Monstruo &m, const Heroe &h) {
     // No bloqueamos el mutex para la comprobación de distancia
     // (usamos mutex solo para prints y accesos a mapa/estados mutables si es necesario)
-    int dist = distanciaManhattan(m.pos, h.pos);
-    if (dist <= m.vision_range) {
-        if (!m.active) {
-            // marcar activo y notificar (protegido al imprimir/actualizar estado)
-            pthread_mutex_lock(&mtx);
-            m.active = true;
-            cout << "👁️  Monstruo " << m.id << " ha detectado al héroe (dist=" << dist << ", vision=" << m.vision_range << ").\n";
-            pthread_mutex_unlock(&mtx);
+     lock_guard<mutex> lock(mtx);
+    for(int i=(monstruo.pos.x-monstruo.vision_range); i<monstruo.pos.x+monstruo.vision_range; i++) {
+        for(int j=(monstruo.pos.y-monstruo.vision_range); i<monstruo.pos.y+monstruo.vision_range;  j++) {
+            if(mapa[i][j] == 2) {
+                int distanciaX = abs(i - heroe.pos.x);
+                int distanciaY = abs(j - heroe.pos.y);
+                int distancia = distanciaX + distanciaY;
+
+                if(distancia <= monstruo.vision_range) {
+                    monstruo.active = true;
+                    return;
+                }
+            }
         }
     }
 }
+    
 
 // =============================
 // Función para imprimir mapa
