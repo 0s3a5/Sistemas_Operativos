@@ -1,38 +1,21 @@
-// juego.cpp
-#include <iostream>
+#include <bits/stdc++.h>
 #include <pthread.h>
 #include <semaphore.h>
-#include <cmath>
 #include <unistd.h>
-
+#include <iostream>
 using namespace std;
-
-// =============================
-// Constantes
-// =============================
-const int FILAS = 20;
-const int COLUMNAS = 20;
-
-// =============================
-// Estructuras
-// =============================
-struct Pos {
-    int x, y;
-};
-
+struct Pos { int x=0, y=0; };
 struct Heroe {
     int id;
     int hp;
     int attack_damage;
     int attack_range;
     Pos pos;
-    Pos ruta[50];
-    int path_len;
-    int path_idx;
-    bool alive;
-    bool reached_goal;
+    vector<Pos> ruta;
+    int path_idx = 0;
+    bool alive = true;
+    bool reached_goal = false;
 };
-
 struct Monstruo {
     int id;
     int hp;
@@ -40,296 +23,565 @@ struct Monstruo {
     int vision_range;
     int attack_range;
     Pos pos;
-    bool active;
-    bool alive;
+    bool active = false;
+    bool alive = true;
 };
+int ROWS = 10;
+int COLS = 10;
 
-// =============================
-// Variables globales
-// =============================
-int mapa[FILAS][COLUMNAS];
-Heroe heroe;
-Monstruo monstruos[3];
-pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
-sem_t sem_heroe;
-sem_t sem_monstruos[3];
+vector<vector<int>> mapa; 
+vector<Heroe> heroes;
+vector<Monstruo> monstruos;
+
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER; //mutex para mapa
+vector<sem_t> sem_heroes;  //semafroo para heroes donde atacan y mueven
+vector<sem_t> sem_monstruos;//semaforo para monstruo que espera lo mismo que el de heroe
+sem_t sem_heroes_done;    // dunciona como contador de heroes 
+sem_t sem_monsters_done;  // funciona como contador de monstruos 
+
 bool juego_activo = true;
 
-// =============================
-// Util: distancia Manhattan
-// =============================
 inline int distanciaManhattan(const Pos &a, const Pos &b) {
     return abs(a.x - b.x) + abs(a.y - b.y);
 }
 
-// =============================
-// Función de visión (perímetro)
-// Si el héroe está dentro de vision_range, activa al monstruo y notifica.
-// =============================
-void comprobarVision(Monstruo &m, const Heroe &h) {
-    // No bloqueamos el mutex para la comprobación de distancia
-    // (usamos mutex solo para prints y accesos a mapa/estados mutables si es necesario)
-    int dist = distanciaManhattan(m.pos, h.pos);
-    if (dist <= m.vision_range) {
-        if (!m.active) {
-            // marcar activo y notificar (protegido al imprimir/actualizar estado)
-            pthread_mutex_lock(&mtx);
-            m.active = true;
-            cout << "👁️  Monstruo " << m.id << " ha detectado al héroe (dist=" << dist << ", vision=" << m.vision_range << ").\n";
-            pthread_mutex_unlock(&mtx);
-        }
-    }
-}
-
-// =============================
-// Función para imprimir mapa
-// =============================
-void imprimirMapa() {
+void imprimirMapaEnArchivoYConsola() {
     pthread_mutex_lock(&mtx);
-    for (int i = 0; i < FILAS; i++) {
-        for (int j = 0; j < COLUMNAS; j++) {
+
+    cout << "Mapa (" << ROWS << "x" << COLS << ")\n";
+
+    for (int i = 0; i < ROWS; ++i) {
+        for (int j = 0; j < COLS; ++j) {
             if (mapa[i][j] == 0) cout << ".";
-            else if (mapa[i][j] == 1) cout << "H";
-            else if (mapa[i][j] == 2) cout << "M";
+            else if (mapa[i][j] == 1) {
+                cout << "H";
+            }
+            else if (mapa[i][j] == 2) {
+                cout << "M";
+            }
         }
         cout << "\n";
     }
-    cout << endl;
-    // Stats rápidos
-    cout << "Héroe HP=" << heroe.hp << " Pos=(" << heroe.pos.x << "," << heroe.pos.y << ")"
-         << (heroe.alive ? "" : " DEAD") << (heroe.reached_goal ? " GOAL" : "") << "\n";
-    for (int i = 0; i < 3; ++i) {
-        cout << "Mon" << monstruos[i].id << " HP=" << monstruos[i].hp
-             << " Pos=(" << monstruos[i].pos.x << "," << monstruos[i].pos.y << ")"
-             << (monstruos[i].alive ? (monstruos[i].active ? " ACTIVE":" PASSIVE") : " DEAD") << "\n";
+    cout << "\n";
+
+    // Stats de héroes
+    for (int i = 0; i < heroes.size(); i++) {
+    cout << "Hero" << heroes[i].id << endl;
+    cout << " HP=" << heroes[i].hp
+         << " Pos=(" << heroes[i].pos.x << "," << heroes[i].pos.y << ")";
+    
+    if (!heroes[i].alive) {
+        cout << " DEAD";
     }
+    if (heroes[i].reached_goal) {
+        cout << " GOAL";
+    }
+    cout << endl;
+}
+
+// Stats de monstruos
+for (int i = 0; i < monstruos.size(); i++) {
+    cout << "Mon" << monstruos[i].id
+         << " HP=" << monstruos[i].hp
+         << " Pos=(" << monstruos[i].pos.x << "," << monstruos[i].pos.y << ")";
+    
+    if (!monstruos[i].alive) {
+        cout << " DEAD";
+    } else {
+        if (monstruos[i].active)
+            cout << " ACTIVE";
+        else
+            cout << " PASSIVE";
+    }
+
+    cout << endl;
+}
+
     cout << "-----------------------------\n";
+
     pthread_mutex_unlock(&mtx);
 }
 
-// =============================
-// Movimiento del héroe
-// =============================
-void moverHeroe() {
+
+void moverHeroeIndice(int idx) {
+    Heroe &h = heroes[idx];
     pthread_mutex_lock(&mtx);
-    if (!heroe.alive || heroe.reached_goal) {
+    if (!h.alive || h.reached_goal) {
         pthread_mutex_unlock(&mtx);
         return;
     }
-    if (heroe.path_idx < heroe.path_len) {
-        // limpiar posición anterior (si está dentro del mapa)
-        if (heroe.pos.x >= 0 && heroe.pos.x < FILAS && heroe.pos.y >= 0 && heroe.pos.y < COLUMNAS)
-            mapa[heroe.pos.x][heroe.pos.y] = 0;
-        // mover
-        heroe.pos = heroe.ruta[heroe.path_idx];
-        if (heroe.pos.x >= 0 && heroe.pos.x < FILAS && heroe.pos.y >= 0 && heroe.pos.y < COLUMNAS)
-            mapa[heroe.pos.x][heroe.pos.y] = 1;
-        heroe.path_idx++;
-        if (heroe.path_idx >= heroe.path_len) heroe.reached_goal = true;
+    if (h.path_idx < (int)h.ruta.size()) {
+        if (h.pos.x >= 0 && h.pos.x < ROWS && h.pos.y >= 0 && h.pos.y < COLS) {// limites del mapa
+            if (mapa[h.pos.x][h.pos.y] == 1){//se cambia a posicion vacia
+                mapa[h.pos.x][h.pos.y] = 0;
+            }
+        }
+        h.pos = h.ruta[h.path_idx];
+        if (h.pos.x >= 0 && h.pos.x < ROWS && h.pos.y >= 0 && h.pos.y < COLS){// se verifica que no pase el mapa
+            mapa[h.pos.x][h.pos.y] = 1;//se marca casilla como heroe
+        }
+        h.path_idx++;
+        if (h.path_idx >= (int)h.ruta.size()){
+            h.reached_goal = true;//se verifica si llego a la posicion
+        }
     }
     pthread_mutex_unlock(&mtx);
 }
 
-// =============================
-// Ataque del héroe (1 ataque total por turno)
-// Héroe ataca el primer monstruo vivo en su rango (si lo hay).
-// =============================
-void ataqueHeroe() {
+void ataqueHeroeIndice(int idx) {
+    Heroe &h = heroes[idx];
     pthread_mutex_lock(&mtx);
-    if (!heroe.alive) { pthread_mutex_unlock(&mtx); return; }
+    if (!h.alive) {
+pthread_mutex_unlock(&mtx); return; 
+    }
 
     bool ataco = false;
-    for (int i = 0; i < 3; ++i) {
-        if (!monstruos[i].alive) continue;
-        int dist = distanciaManhattan(heroe.pos, monstruos[i].pos);
-        if (dist <= heroe.attack_range) {
-            monstruos[i].hp -= heroe.attack_damage;
-            cout << "🗡️  Héroe ataca a Mon" << monstruos[i].id
-                 << " (-" << heroe.attack_damage << " HP). Queda HP=" << max(0, monstruos[i].hp) << "\n";
-            if (monstruos[i].hp <= 0) {
-                monstruos[i].alive = false;
-                // limpiar mapa
-                if (monstruos[i].pos.x >=0 && monstruos[i].pos.x < FILAS && monstruos[i].pos.y >=0 && monstruos[i].pos.y < COLUMNAS)
-                    mapa[monstruos[i].pos.x][monstruos[i].pos.y] = 0;
-                cout << "💀 Mon" << monstruos[i].id << " ha muerto.\n";
+    for (size_t j = 0; j < monstruos.size(); ++j) {
+        Monstruo &m = monstruos[j];
+        if (!m.alive){
+            continue;
+        }
+        int dist = distanciaManhattan(h.pos, m.pos);
+        if (dist <= h.attack_range) {
+            m.hp -= h.attack_damage;
+            cout << " heroe" << h.id << " ataca a mosntruo" << m.id<<endl;
+            cout << " (-" << h.attack_damage << " HP) le queda" << max(0, m.hp) << endl;;
+            if (m.hp <= 0) {
+                m.alive = false;
+                if (m.pos.x >= 0 && m.pos.x < ROWS && m.pos.y >=0 && m.pos.y < COLS){
+                    mapa[m.pos.x][m.pos.y] = 0;
+                cout << "monstruo" << m.id << " murio"<< endl;}
+                
             }
             ataco = true;
-            break; // solo 1 ataque por turno del héroe
+            break; // sólo 1 ataque por héroe por turno
         }
     }
     if (!ataco) {
-        cout << "⚔️  Héroe no encontró monstruos en su rango de ataque.\n";
+        cout << "heroe" << h.id << " sin monstruo en rango"<<endl;
     }
     pthread_mutex_unlock(&mtx);
 }
 
-// =============================
-// Movimiento del monstruo (usa Manhattan greedy) y ataque si está en rango
-// =============================
-void moverYAtacarMonstruo(Monstruo &m) {
-    // Primero comprobar visión (sin lock)
-    comprobarVision(m, heroe);
+bool alerta_global = false;
 
+
+void comprobarVisionYAccionarMonstruo(int midx) {
+    Monstruo &m = monstruos[midx];
+    int best = -1;//heroe mas cercano
+    int bestd = INT_MAX;
     pthread_mutex_lock(&mtx);
-    if (!m.alive || !heroe.alive || heroe.reached_goal) {
-        pthread_mutex_unlock(&mtx);
-        return;
+    for (size_t i = 0; i < heroes.size(); ++i) {
+        if (!heroes[i].alive){
+            continue;}
+        int d = distanciaManhattan(m.pos, heroes[i].pos);
+        if (d < bestd) {
+            bestd = d; best = (int)i; }
     }
-
-    int dist = distanciaManhattan(m.pos, heroe.pos);
-    if (dist > m.vision_range) {
-        m.active = false;
+    pthread_mutex_unlock(&mtx);
+    if (best == -1) return; 
+    if (bestd <= m.vision_range) {//si detecta monstruo se activan todos
+        pthread_mutex_lock(&mtx);
+        alerta_global = true;
+        if (!m.active) {
+            m.active = true;
+            cout << " mosntruo " << m.id << " dectoa heroe en (dist=" << bestd << ")"<<endl;
+        }
         pthread_mutex_unlock(&mtx);
-        return;
     }
-
-    // si activo, intentar atacar si en rango
-    if (dist <= m.attack_range) {
-        // atacar
-        heroe.hp -= m.attack_damage;
-        cout << "🔥 Mon" << m.id << " ataca al Héroe (-" << m.attack_damage << " HP). Héroe HP=" << max(0, heroe.hp) << "\n";
-        if (heroe.hp <= 0) {
-            heroe.alive = false;
-            juego_activo = false;
-            cout << "💀 ¡El héroe ha muerto!\n";
-            // opcional: limpiar la casilla del héroe
-            if (heroe.pos.x >=0 && heroe.pos.x < FILAS && heroe.pos.y >=0 && heroe.pos.y < COLUMNAS)
-                mapa[heroe.pos.x][heroe.pos.y] = 0;
+    if (alerta_global) {
+        pthread_mutex_lock(&mtx);
+        m.active = true;//activa todo
+        pthread_mutex_unlock(&mtx);
+    } else {
+        return; // nadie detectó aún, no hace nada
+    }
+    pthread_mutex_lock(&mtx);
+    Heroe &target = heroes[best];
+    if (bestd <= m.attack_range && target.alive) {//rango de ataque 
+        target.hp -= m.attack_damage;
+        cout << "monstruo" << m.id << " ataca a heroe" << target.id << " (-" << m.attack_damage << " HP)  vida " << max(0, target.hp) << endl;
+        if (target.hp <= 0) {//si muere heore
+            target.alive = false;
+            if (target.pos.x >= 0 && target.pos.x < ROWS && target.pos.y >= 0 && target.pos.y < COLS){
+                mapa[target.pos.x][target.pos.y] = 0;//se cambia casilla a vacia
+            }
+            cout << "heroe " << target.id << " murio"<<endl;
         }
         pthread_mutex_unlock(&mtx);
         return;
     }
-
-    // si no puede atacar, moverse una casilla que reduzca la distancia
-    // limpiar posición anterior
-    if (m.pos.x >=0 && m.pos.x < FILAS && m.pos.y >=0 && m.pos.y < COLUMNAS)
-        mapa[m.pos.x][m.pos.y] = 0;
-
-    int dx = heroe.pos.x - m.pos.x;
-    int dy = heroe.pos.y - m.pos.y;
+    pthread_mutex_unlock(&mtx);// se mueve una casilla hacia el heroe si no esta en rango de ataque
+    int dx = heroes[best].pos.x - m.pos.x;
+    int dy = heroes[best].pos.y - m.pos.y;
     if (abs(dx) > abs(dy)) m.pos.x += (dx > 0 ? 1 : -1);
-    else if (dy != 0) m.pos.y += (dy > 0 ? 1 : -1);
-
-    // actualizar en mapa (si dentro)
-    if (m.pos.x >=0 && m.pos.x < FILAS && m.pos.y >=0 && m.pos.y < COLUMNAS)
+    else if (dy != 0) {
+        m.pos.y += (dy > 0 ? 1 : -1);
+    }
+    pthread_mutex_lock(&mtx);
+    if (m.pos.x >= 0 && m.pos.x < ROWS && m.pos.y >= 0 && m.pos.y < COLS){
         mapa[m.pos.x][m.pos.y] = 2;
-
-    cout << "[Mon" << m.id << "] se mueve a (" << m.pos.x << "," << m.pos.y << ")\n";
+    }
     pthread_mutex_unlock(&mtx);
 }
-
-// =============================
-// Hilos
-// =============================
-void* hiloHeroe(void*) {
-    while (juego_activo && heroe.alive && !heroe.reached_goal) {
-        // hero tiene su semáforo; main dará permiso inicial
-        sem_wait(&sem_heroe);
-
-        // esperar tecla 'n' (se lee con bloqueo fuera del mutex)
-        char tecla;
-        do {
-            cout << "Presiona 'n' + Enter para siguiente turno: ";
-            cin >> tecla;
-        } while (tecla != 'n');
-
-        // mover + ataque del héroe
-        moverHeroe();
-        ataqueHeroe();
-
-        // mostrar mapa parcial antes de los monstruos (opcional)
-        imprimirMapa();
-
-        // dar turno a cada monstruo uno por uno
-        for (int i = 0; i < 3; ++i) {
-            sem_post(&sem_monstruos[i]);
-        }
+void* hiloHeroe(void* arg) {
+    int idx = *((int*)arg);
+    while (juego_activo && heroes[idx].alive && !heroes[idx].reached_goal) {
+        sem_wait(&sem_heroes[idx]);//semaforo que se activa en main
+        if (!juego_activo) break;
+        moverHeroeIndice(idx);
+        ataqueHeroeIndice(idx);
+        sem_post(&sem_heroes_done);//semaforo indica que termino turno
     }
-    // Si sale, desbloquear monstruos para que terminen si quedan esperando
-    for (int i = 0; i < 3; ++i) sem_post(&sem_monstruos[i]);
-    return nullptr;
+    sem_post(&sem_heroes_done);//le devuelve el termino al main
+    return nullptr;//se cierra todo semaforo y puntero
 }
 
 void* hiloMonstruo(void* arg) {
     int idx = *((int*)arg);
-  while (juego_activo && monstruos[idx].alive && heroe.alive && !heroe.reached_goal) {
-        sem_wait(&sem_monstruos[idx]);
-
+    while (juego_activo && monstruos[idx].alive) {
+        sem_wait(&sem_monstruos[idx]);//semaforo se activa en main
         if (!juego_activo) break;
-        if (!monstruos[idx].alive) {
-            // si murió mientras esperaba, el último devuelve turno al héroe
-            if (idx == 2) sem_post(&sem_heroe);
+        comprobarVisionYAccionarMonstruo(idx);
+        sem_post(&sem_monsters_done);//indica termino de accion con semaforo
+    }
+    sem_post(&sem_monsters_done);//se devuelve termino al main
+    return nullptr;//se cierra todo semaforo y puntero
+}
+
+// Lectura del archivo de configuraci
+vector<string> splitWords(const string &s) {
+    vector<string> out;
+    istringstream iss(s);
+    string w;
+    while (iss >> w) out.push_back(w);
+    return out;
+}
+
+string trim(const string &s) {
+    size_t a = s.find_first_not_of(" \t\r\n");
+    if (a==string::npos) return "";
+    size_t b = s.find_last_not_of(" \t\r\n");
+    return s.substr(a, b-a+1);
+}
+
+bool startsWith(const string &s, const string &p) {
+    if (s.size() < p.size()) return false;
+    return s.substr(0, p.size()) == p;
+}
+
+vector<Pos> parsePathLines(const vector<string>& lines) {
+    vector<Pos> out;
+    for (auto &ln : lines) {
+        string t = ln;
+        for (char &c : t) if (c=='('||c==')'||c==',' ) c = ' ';
+        istringstream iss(t);
+        int a,b;
+        while (iss >> a >> b) {
+            out.push_back(Pos{a,b});
+        }
+    }
+    return out;
+}
+
+bool cargarDesdeArchivo(const string &filename) {
+    ifstream ifs(filename);
+    if (!ifs) {
+        cerr << "No se pudo abrir " << filename << endl;
+        return false;
+    }
+
+    string line;
+    vector<string> bufferPathLines;
+    int currentHeroId = 0;
+    int currentMonsterId = 0;
+    map<int, Heroe> tmpHeroes;
+    map<int, Monstruo> tmpMonsters;
+
+    while (getline(ifs, line)) {
+        string s = trim(line);
+        if (s.empty()) continue;
+        if (s[0] == '#') continue;
+        vector<string> parts = splitWords(s);
+        if (parts.empty()) continue;
+        // cambio de tamaño del mapa
+        if (parts[0] == "GRID_SIZE" && parts.size() >= 3) {
+            ROWS = stoi(parts[1]);
+            COLS = stoi(parts[2]);
             continue;
         }
 
-        // comprobar visión, moverse y atacar si procede
-        moverYAtacarMonstruo(monstruos[idx]);
+        if (startsWith(parts[0], "HERO_")) {
+            string key = parts[0]; 
+            size_t p1 = key.find('_',5); 
+            vector<string> toks;
+            {
+                istringstream is(key);
+                string t;
+                while (getline(is, t, '_')) toks.push_back(t);
+            }
+            if (toks.size() < 3) continue;
+            int id = stoi(toks[1]);
+            string prop = toks[2];
+            if (prop == "PATH") {
+                string rest = s.substr(s.find("PATH") + 4);
+                bufferPathLines.clear();
+                if (trim(rest).size() > 0) bufferPathLines.push_back(rest);
+                streampos lastPos = ifs.tellg();
+                string next;
+                while (getline(ifs, next)) {
+                    string tn = trim(next);
+                    if (tn.empty()) { lastPos = ifs.tellg(); continue; }
+                    if (tn.find('(') != string::npos) {
+                        bufferPathLines.push_back(tn);
+                        lastPos = ifs.tellg();
+                    } else {
+                        ifs.seekg(lastPos);
+                        break;
+                    }
+                    lastPos = ifs.tellg();
+                }
+                vector<Pos> ruta = parsePathLines(bufferPathLines);
+                tmpHeroes[id].ruta = ruta;
+                tmpHeroes[id].id = id;
+                continue;
+            } else if (prop == "START") {
+                if (parts.size() >= 3) {
+                    int x = stoi(parts[1+1]); 
+                }
+                string rest = s.substr(s.find("START") + 5);
+                istringstream iss(rest);
+                int x,y; if (iss >> x >> y) {
+                    tmpHeroes[id].pos = Pos{x,y};
+                    tmpHeroes[id].id = id;
+                }
+                continue;
+            } else {
+                string rest = s.substr(s.find(prop) + prop.size());
+                istringstream iss(rest);
+                int val;
+                if (!(iss >> val)) {
+                    if (parts.size() >= 2) val = stoi(parts[1]);
+                    else continue;
+                }
+                if (prop == "HP") tmpHeroes[id].hp = val;
+                else if (prop == "ATTACK") {
+                    if (key.find("ATTACK_DAMAGE") != string::npos) tmpHeroes[id].attack_damage = val;
+                } else if (prop == "ATTACK_DAMAGE") tmpHeroes[id].attack_damage = val;
+                else if (prop == "ATTACK_RANGE") tmpHeroes[id].attack_range = val;
+                continue;
+            }
+        }
 
-        // si es el último monstruo, devolver turno al héroe (ciclo)
-        if (idx == 2) sem_post(&sem_heroe);
+        if (startsWith(parts[0], "MONSTER_")) {
+            vector<string> toks;
+            {
+                istringstream is(parts[0]);
+                string t;
+                while (getline(is, t, '_')) toks.push_back(t);
+            }
+            if (toks.size() < 3) continue;
+            int id = stoi(toks[1]);
+            string prop = toks[2];
+            string rest;
+            if (s.size() > parts[0].size()) rest = trim(s.substr(parts[0].size()));
+            else rest = "";
+            if (prop == "COORDS") {
+                istringstream iss(rest);
+                int x,y; if (iss >> x >> y) {
+                    tmpMonsters[id].pos = Pos{x,y};
+                    tmpMonsters[id].id = id;
+                }
+            } else {
+                int val = 0;
+                if (!rest.empty()) {
+                    istringstream iss(rest);
+                    iss >> val;
+                } else if (parts.size() >= 2) {
+                    val = stoi(parts[1]);
+                }
+                if (prop == "HP") tmpMonsters[id].hp = val;
+                else if (prop == "ATTACK") {
+                    if (s.find("ATTACK_DAMAGE") != string::npos) tmpMonsters[id].attack_damage = val;
+                } else if (prop == "ATTACK_DAMAGE") tmpMonsters[id].attack_damage = val;
+                else if (prop == "VISION") {
+                    if (s.find("VISION_RANGE") != string::npos) tmpMonsters[id].vision_range = val;
+                } else if (prop == "VISION_RANGE") tmpMonsters[id].vision_range = val;
+                else if (prop == "ATTACK_RANGE") tmpMonsters[id].attack_range = val;
+            }
+            continue;
+        }
+
+        if (parts[0] == "MONSTER_COUNT") {
+            continue;
+        }
+    } 
+
+    heroes.clear();
+    monstruos.clear();
+
+    if (!tmpHeroes.empty()) {
+        vector<int> keys;
+        for (auto &p : tmpHeroes) keys.push_back(p.first);
+        sort(keys.begin(), keys.end());
+        for (int k : keys) {
+            Heroe h = tmpHeroes[k];
+            // defaults
+            if (h.attack_range==0) h.attack_range = 1;
+            if (h.attack_damage==0) h.attack_damage = 10;
+            if (h.hp==0) h.hp = 100;
+            heroes.push_back(h);
+        }
     }
-    return nullptr;
+
+    if (!tmpMonsters.empty()) {
+        vector<int> keys;
+        for (auto &p : tmpMonsters) keys.push_back(p.first);
+        sort(keys.begin(), keys.end());
+        for (int k : keys) {
+            Monstruo m = tmpMonsters[k];
+            if (m.attack_range==0) m.attack_range = 1;
+            if (m.attack_damage==0) m.attack_damage = 5;
+            if (m.hp==0) m.hp = 50;
+            if (m.vision_range==0) m.vision_range = 5;
+            monstruos.push_back(m);
+        }
+    }
+
+    if (heroes.empty()) {
+        cerr << "no hay heroes "<<endl;
+    }
+    if (monstruos.empty()) {
+        cerr << "no hay monstruos <<endl";
+    }
+
+    return true;
 }
+//Fin de dunciones inicio del main
+//aqui se viene lo serio
 
-// =============================
-// MAIN
-// =============================
-int main() {
-    // Inicializar mapa vacío
-    for (int i = 0; i < FILAS; ++i)
-        for (int j = 0; j < COLUMNAS; ++j)
-            mapa[i][j] = 0;
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        cout << "Uso: " << argv[0] << " <archivo_config.txt>"<<endl;//carga dek archivo
+        return 1;
+    }
+    string filename = argv[1];
+    if (!cargarDesdeArchivo(filename)) {
+        cout <<"cargar denuevo"<<endl;
+        return 1;
+    }
+    mapa.assign(ROWS, vector<int>(COLS, 0));//inicia mapa en 0 ya que no se han definido monstruos ni heroes
+    for (auto &h : heroes) {
+        if (h.pos.x >= 0 && h.pos.x < ROWS && h.pos.y >= 0 && h.pos.y < COLS){//dentro de limites
+            mapa[h.pos.x][h.pos.y] = 1;//se colocan heroes en mapa
+        }
+    }
+    for (auto &m : monstruos) {
+        if (m.pos.x >= 0 && m.pos.x < ROWS && m.pos.y >= 0 && m.pos.y < COLS) {//dentro de limites
+            if (mapa[m.pos.x][m.pos.y] == 0){
+                mapa[m.pos.x][m.pos.y] = 2;//se colocan monstruos en el mapa
+        }
+        }    
+    }
+    int H = (int)heroes.size();
+    int M = (int)monstruos.size();
+    sem_heroes.assign(H, {});//inicio semaforo heroe
+    sem_monstruos.assign(M, {});//inicio semaforo monstruo
+    for (int i = 0; i < H; ++i) {
+sem_init(&sem_heroes[i], 0, 0);
+    }
+    for (int i = 0; i < M; ++i) {
+sem_init(&sem_monstruos[i], 0, 0);
+    }
 
-    // Inicializar héroe
-    heroe.id = 1;
-    heroe.hp = 150;
-    heroe.attack_damage = 20;
-    heroe.attack_range = 3;
-    heroe.pos = {2,2};
-    Pos ruta[] = {
-        {3,2}, {4,2}, {5,2}, {5,3}, {5,4}, {6,4}
-    };
-    heroe.path_len = sizeof(ruta)/sizeof(ruta[0]);
-    heroe.path_idx = 0;
-    for (int i = 0; i < heroe.path_len; ++i) heroe.ruta[i] = ruta[i];
-    heroe.alive = true;
-    heroe.reached_goal = false;
+    sem_init(&sem_heroes_done, 0, 0);
+    sem_init(&sem_monsters_done, 0, 0);
+//todo inicia en 0
 
-    // Inicializar monstruos (ejemplo PDF; puedes cambiar)
-    monstruos[0].id = 1; monstruos[0].hp = 50; monstruos[0].attack_damage = 10; monstruos[0].vision_range = 5; monstruos[0].attack_range = 1; monstruos[0].pos = {8,4}; monstruos[0].active = false; monstruos[0].alive = true;
-    monstruos[1].id = 2; monstruos[1].hp = 50; monstruos[1].attack_damage = 10; monstruos[1].vision_range = 5; monstruos[1].attack_range = 1; monstruos[1].pos = {15,10}; monstruos[1].active = false; monstruos[1].alive = true;
-    monstruos[2].id = 3; monstruos[2].hp = 80; monstruos[2].attack_damage = 15; monstruos[2].vision_range = 4; monstruos[2].attack_range = 2; monstruos[2].pos = {5,8}; monstruos[2].active = false; monstruos[2].alive = true;
+    vector<pthread_t> th_heroes(H);//Thread de heroe
+    vector<pthread_t> th_monsters(M);//thread de monstrio
+    vector<int> idsH(H), idsM(M);//thread de mapa
+    for (int i = 0; i < H; ++i) {idsH[i] = i;}
+    for (int i = 0; i < M; ++i) {idsM[i] = i;}
 
-    // Colocar en mapa
-    mapa[heroe.pos.x][heroe.pos.y] = 1;
-    for (int i = 0; i < 3; ++i) mapa[monstruos[i].pos.x][monstruos[i].pos.y] = 2;
+    for (int i = 0; i < H; ++i){
+        pthread_create(&th_heroes[i], nullptr, hiloHeroe, &idsH[i]);}
+    for (int i = 0; i < M; ++i)
+{pthread_create(&th_monsters[i], nullptr, hiloMonstruo, &idsM[i]);}
 
-    // Inicializar semáforos (héroe empieza)
-    sem_init(&sem_heroe, 0, 1);
-    for (int i = 0; i < 3; ++i) sem_init(&sem_monstruos[i], 0, 0);
+    while (juego_activo) {
+        imprimirMapaEnArchivoYConsola();
 
-    // Crear hilos
-    pthread_t th_heroe;
-    pthread_t th_monstruos[3];
-    int ids[3] = {0,1,2};
+        cout << "Presiona n siguiente turno (q para salir)"<<endl;
+        string aux;
+        cin >> aux;
 
-    pthread_create(&th_heroe, nullptr, hiloHeroe, nullptr);
-    for (int i = 0; i < 3; ++i) pthread_create(&th_monstruos[i], nullptr, hiloMonstruo, &ids[i]);
+        if (aux == "q") { juego_activo = false; break; }
+        if (aux != "n") {continue;}
+else{break;}
+        for (int i = 0; i < H; ++i) {//dar turno a heroes
+            if (heroes[i].alive && !heroes[i].reached_goal)//verifica si esta vivo y si no llego a meta
+                sem_post(&sem_heroes[i]);
+            else
+                sem_post(&sem_heroes_done);//se espera semaforo si no se ocupa
+        }
+        for (int i = 0; i < H; ++i){
+sem_wait(&sem_heroes_done);//espera señal de termino de cada hereo
+        }
+        imprimirMapaEnArchivoYConsola();
+        for (int i = 0; i < M; ++i) {
+            if (monstruos[i].alive)
+                sem_post(&sem_monstruos[i]);//dar turno a monstruos
+            else
+                sem_post(&sem_monsters_done);//si no tienen turno se cierra semaforo
+        }
+        for (int i = 0; i < M; ++i){
+            sem_wait(&sem_monsters_done);
+        }//espera cada termino de monstruo
+        imprimirMapaEnArchivoYConsola();
+        bool anyHeroAlive = false;
+        bool allReached = true;
+        for (auto &h : heroes) {
+            if (h.alive) anyHeroAlive = true;//verifica si todos estan vivos
+            if (!h.reached_goal) allReached = false;//verifica si todo llego ameta
+        }
+        if (!anyHeroAlive) {
+            cout << "todos murieron puros mancos"<<endl ;
+            juego_activo = false;
+            break;
+        }
+        if (allReached) {
+            cout << "todos llegaron, unas maquinas";
+            juego_activo = false;
+            break;
+        }
+        usleep(100000);
+    }
+    for (int i = 0; i < H; ++i){
+        sem_post(&sem_heroes[i]);//se espera semaforos de heroes
+    }
+    for (int i = 0; i < M; ++i) {
+        sem_post(&sem_monstruos[i]);}//se espera semaforo de monstruos
 
-    // Esperar condición de final (hilo héroe terminará cuando juego_activo false o llegó meta)
-    pthread_join(th_heroe, nullptr);
-    for (int i = 0; i < 3; ++i) pthread_join(th_monstruos[i], nullptr);
 
-    // Mostrar estado final
-    imprimirMapa();
-    if (heroe.reached_goal) cout << "🏆 El héroe alcanzó la meta.\n";
-    else if (!heroe.alive) cout << "💀 El héroe fue derrotado.\n";
-    else cout << "🛑 Simulación terminada.\n";
+    for (int i = 0; i < H; ++i){
+        pthread_join(th_heroes[i], nullptr);//se espera threas de heroes
+    }
+    for (int i = 0; i < M; ++i) {
+        pthread_join(th_monsters[i], nullptr);//se espera threas de monstruos
+    }
+    imprimirMapaEnArchivoYConsola();
 
-    // Limpiar semáforos y mutex
-    sem_destroy(&sem_heroe);
-    for (int i = 0; i < 3; ++i) sem_destroy(&sem_monstruos[i]);
-    pthread_mutex_destroy(&mtx);
+    for (int i = 0; i < H; ++i) {
+        sem_destroy(&sem_heroes[i]);//se destruyen semafors de heroes
+    }
+    for (int i = 0; i < M; ++i) {
+        sem_destroy(&sem_monstruos[i]);//se destruyen semafors de mosntruos
+    }
+    sem_destroy(&sem_heroes_done);//se cierran semaforors auciliares de heroes
+    sem_destroy(&sem_monsters_done); //se cierran semaforos auxiliares de monstruos
+    pthread_mutex_destroy(&mtx); //se destruye el tread del mapa
 
+    cout << "final"<<endl;
     return 0;
 }
