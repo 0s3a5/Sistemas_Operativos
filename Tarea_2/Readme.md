@@ -51,3 +51,15 @@ cambios a realizar
 -hacer que se cambien bien las letras en el mapa
 -que todos los monstruos se pongan en alerta y se muevan
 -verificar las posiciones (no se ven en el mapa las de heroes)
+
+*29/10/25 23:20 prueba v3.0 funcional
+
+actualizacion en el uso de threads
+viendo el codigo del erick me di cuenta que me complique la vida
+tengo muchas funciones y muchos threads
+zona critica sigue siendo el grid tablero o mapa
+ahora el heroe y monstruos se manejan como threads
+
+cambios a realizar
+-hacer que funcione con mas de un heroe
+-hacer que se le pueda meter un archivo 
