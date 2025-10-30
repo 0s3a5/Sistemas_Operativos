@@ -614,6 +614,6 @@ int main(int argc, char** argv) {
     sem_destroy(&sem_monsters_done);
     pthread_mutex_destroy(&mtx);
 
-    cout << "Simulación finalizada. Salida guardada en: " << salida_filename << "\n";
+    cout << "Simulación \n";
     return 0;
 }
