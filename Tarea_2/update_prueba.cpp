@@ -89,17 +89,7 @@ void imprimirMapaEnArchivoYConsola() {
     }
     ss << "-----------------------------\n";
 
-    string snap = ss.str();
-    // Console
-    cout << snap;
-    // Append to file
-    ofstream ofs(salida_filename, ios::app);
-    if (ofs) {
-        ofs << snap;
-        ofs.close();
-    } else {
-        cerr << "No se pudo abrir " << salida_filename << " para escribir.\n";
-    }
+     cout << ss.str();
     pthread_mutex_unlock(&mtx);
 }
 
