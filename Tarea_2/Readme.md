@@ -78,6 +78,24 @@ se copia el codigo de prueba_update
 y sepues ctrl+x
 
  se pone 
- g++ -std=c++17 -pthread juego.cpp -o juego
+ g++ -std=c++17 -pthread tarea.cpp -o tarea
 
 ./juego ejemplo2.txt
+
+*30/10/25 Final v1.0 18:37
+
+esta finalmnete listo esta todo detalladao con comentarios
+las funciones mas importantes estan hechas en la caprteta Funciones_threads
+
+para entregar se debe entregar el archivo que se crea al hacer
+g++ -std=c++17 -pthread juego.cpp -o juego
+
+
+dejar en claro que el archivo de prueba fue el ejemplo 2
+
+si es posible probar con los otros
+
+en el readme para su ejecucion es 
+
+./tarea ejemplo2.txt
+
