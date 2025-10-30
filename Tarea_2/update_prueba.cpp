@@ -510,9 +510,6 @@ int main(int argc, char** argv) {
     string filename = argv[1];
 
     // limpiar archivo de salida
-    ofstream ofs(salida_filename, ios::trunc);
-    if (!ofs) cerr << "No se pudo crear archivo de salida " << salida_filename << "\n";
-    else ofs.close();
 
     if (!cargarDesdeArchivo(filename)) {
         cerr << "Error cargando archivo. Abortando.\n";
