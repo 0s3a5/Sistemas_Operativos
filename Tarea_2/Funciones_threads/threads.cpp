@@ -1,49 +1,25 @@
-void* hiloHeroe(void*) {
-    while (juego_activo && heroe.alive && !heroe.reached_goal) {
-        // hero tiene su semáforo; main dará permiso inicial
-        sem_wait(&sem_heroe);
 
-        // esperar tecla 'n' (se lee con bloqueo fuera del mutex)
-        char tecla;
-        do {
-            cout << "Presiona 'n' + Enter para siguiente turno: ";
-            cin >> tecla;
-        } while (tecla != 'n');
-
-        // mover + ataque del héroe
-        moverHeroe();
-        ataqueHeroe();
-
-        // mostrar mapa parcial antes de los monstruos (opcional)
-        imprimirMapa();
-
-        // dar turno a cada monstruo uno por uno
-        for (int i = 0; i < 3; ++i) {
-            sem_post(&sem_monstruos[i]);
-        }
+void* hiloHeroe(void* arg) {
+    int idx = *((int*)arg);
+    while (juego_activo && heroes[idx].alive && !heroes[idx].reached_goal) {
+        sem_wait(&sem_heroes[idx]);//semaforo que se activa en main
+        if (!juego_activo) break;
+        moverHeroeIndice(idx);
+        ataqueHeroeIndice(idx);
+        sem_post(&sem_heroes_done);//semaforo indica que termino turno
     }
-    // Si sale, desbloquear monstruos para que terminen si quedan esperando
-    for (int i = 0; i < 3; ++i) sem_post(&sem_monstruos[i]);
-    return nullptr;
+    sem_post(&sem_heroes_done);//le devuelve el termino al main
+    return nullptr;//se cierra todo semaforo y puntero
 }
 
 void* hiloMonstruo(void* arg) {
     int idx = *((int*)arg);
-    while (juego_activo && monstruos[idx].alive && heroe.alive) {
-        sem_wait(&sem_monstruos[idx]);
-
+    while (juego_activo && monstruos[idx].alive) {
+        sem_wait(&sem_monstruos[idx]);//semaforo se activa en main
         if (!juego_activo) break;
-        if (!monstruos[idx].alive) {
-            // si murió mientras esperaba, el último devuelve turno al héroe
-            if (idx == 2) sem_post(&sem_heroe);
-            continue;
-        }
-
-        // comprobar visión, moverse y atacar si procede
-        moverYAtacarMonstruo(monstruos[idx]);
-
-        // si es el último monstruo, devolver turno al héroe (ciclo)
-        if (idx == 2) sem_post(&sem_heroe);
+        comprobarVisionYAccionarMonstruo(idx);
+        sem_post(&sem_monsters_done);//indica termino de accion con semaforo
     }
-    return nullptr;
+    sem_post(&sem_monsters_done);//se devuelve termino al main
+    return nullptr;//se cierra todo semaforo y puntero
 }
