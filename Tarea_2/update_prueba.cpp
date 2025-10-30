@@ -177,8 +177,10 @@ void moverYAtacarMonstruo(Monstruo &m) {
     comprobarVision(m, heroe);
 
     pthread_mutex_lock(&mtx);
-    if (!m.alive) { pthread_mutex_unlock(&mtx); return; }
-
+   if (!m.alive || !heroe.alive || heroe.reached_goal) {
+    pthread_mutex_unlock(&mtx);
+    return;
+}
     int dist = distanciaManhattan(m.pos, heroe.pos);
     if (dist > m.vision_range) {
         m.active = false;
@@ -255,7 +257,7 @@ void* hiloHeroe(void*) {
 
 void* hiloMonstruo(void* arg) {
     int idx = *((int*)arg);
-    while (juego_activo && monstruos[idx].alive && heroe.alive) {
+    while (juego_activo && monstruos[idx].alive && heroe.alive && !heroe.reached_goal) {
         sem_wait(&sem_monstruos[idx]);
 
         if (!juego_activo) break;
