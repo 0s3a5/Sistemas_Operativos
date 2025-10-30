@@ -492,7 +492,7 @@ int main(int argc, char** argv) {
             break;
         }
         if (allReached) {
-            cout << t"odos llegaron unas maquinas";
+            cout << "todos llegaron unas maquinas";
             juego_activo = false;
             break;
         }
