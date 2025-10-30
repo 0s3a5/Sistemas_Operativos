@@ -2,6 +2,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include <unistd.h>
+#include <iostream>
 using namespace std;
 struct Pos { int x=0, y=0; };
 struct Heroe {
@@ -25,6 +26,9 @@ struct Monstruo {
     bool active = false;
     bool alive = true;
 };
+int ROWS = 10;
+int COLS = 10;
+
 vector<vector<int>> mapa; 
 vector<Heroe> heroes;
 vector<Monstruo> monstruos;
@@ -247,7 +251,7 @@ void* hiloMonstruo(void* arg) {
 
 // Lectura del archivo de configuraci
 vector<string> splitWords(const string &s) {
-    vector<string> out;on
+    vector<string> out;
     istringstream iss(s);
     string w;
     while (iss >> w) out.push_back(w);
@@ -448,13 +452,14 @@ bool cargarDesdeArchivo(const string &filename) {
         cerr << "no hay heroes "<<endl;
     }
     if (monstruos.empty()) {
-        cerr << "no hay monstruos <<endl;
+        cerr << "no hay monstruos <<endl";
     }
 
     return true;
 }
 //Fin de dunciones inicio del main
 //aqui se viene lo serio
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         cout << "Uso: " << argv[0] << " <archivo_config.txt>"<<endl;//carga dek archivo
@@ -507,8 +512,10 @@ sem_init(&sem_monstruos[i], 0, 0);
     while (juego_activo) {
         imprimirMapaEnArchivoYConsola();
 
-        cout << "Presiona 'n' + Enter para siguiente turno (q para salir): ";
+        cout << "Presiona n siguiente turno (q para salir)"<<endl;
         string aux;
+        cin >> aux;
+
         if (aux == "q") { juego_activo = false; break; }
         if (aux != "n") {continue;}
 else{break;}
@@ -554,8 +561,8 @@ sem_wait(&sem_heroes_done);//espera señal de termino de cada hereo
         sem_post(&sem_heroes[i]);//se espera semaforos de heroes
     }
     for (int i = 0; i < M; ++i) {
-        sem_post(&sem_monstruos[i])};//se espera semaforo de monstruos
-}
+        sem_post(&sem_monstruos[i]);}//se espera semaforo de monstruos
+
 
     for (int i = 0; i < H; ++i){
         pthread_join(th_heroes[i], nullptr);//se espera threas de heroes
