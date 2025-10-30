@@ -1,17 +1,9 @@
-// juego.cpp
-// Compilar: g++ -std=c++17 -pthread juego.cpp -o juego
-// Ejecutar: ./juego ejemplo2.txt
 #include <bits/stdc++.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include <unistd.h>
 using namespace std;
-
-// -----------------------------
-// Estructuras
-// -----------------------------
 struct Pos { int x=0, y=0; };
-
 struct Heroe {
     int id;
     int hp;
@@ -23,7 +15,6 @@ struct Heroe {
     bool alive = true;
     bool reached_goal = false;
 };
-
 struct Monstruo {
     int id;
     int hp;
@@ -34,38 +25,25 @@ struct Monstruo {
     bool active = false;
     bool alive = true;
 };
-
-// -----------------------------
-// Variables globales (dinámicas)
-// -----------------------------
-int ROWS = 20, COLS = 20;
-vector<vector<int>> mapa; // 0 empty, 1 hero, 2 monster (if overlap choose priority printing)
+vector<vector<int>> mapa; 
 vector<Heroe> heroes;
 vector<Monstruo> monstruos;
 
-pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
-
-// Semáforos y contadores para coordinación de rondas
-vector<sem_t> sem_heroes;
-vector<sem_t> sem_monstruos;
-sem_t sem_heroes_done;    // contarán cuántos héroes terminaron
-sem_t sem_monsters_done;  // contarán cuántos monstruos terminaron
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER; //mutex para mapa
+vector<sem_t> sem_heroes;  //semafroo para heroes donde atacan y mueven
+vector<sem_t> sem_monstruos;//semaforo para monstruo que espera lo mismo que el de heroe
+sem_t sem_heroes_done;    // dunciona como contador de heroes 
+sem_t sem_monsters_done;  // funciona como contador de monstruos 
 
 bool juego_activo = true;
 
-// Archivo de salida (append)
-string salida_filename = "sim_output.txt";
-
-// -----------------------------
-// Utilidades
-// -----------------------------
 inline int distanciaManhattan(const Pos &a, const Pos &b) {
     return abs(a.x - b.x) + abs(a.y - b.y);
 }
 
 void imprimirMapaEnArchivoYConsola() {
     pthread_mutex_lock(&mtx);
-    // Construir snapshot en string
+
     ostringstream ss;
     ss << "Mapa (" << ROWS << "x" << COLS << ")\n";
     for (int i = 0; i < ROWS; ++i) {
