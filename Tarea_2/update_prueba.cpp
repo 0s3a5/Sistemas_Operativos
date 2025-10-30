@@ -158,7 +158,8 @@ void ataqueHeroeIndice(int idx) {
     pthread_mutex_unlock(&mtx);
 }
 
-extern bool alerta_global;
+bool alerta_global = false;
+
 
 void comprobarVisionYAccionarMonstruo(int midx) {
     Monstruo &m = monstruos[midx];
