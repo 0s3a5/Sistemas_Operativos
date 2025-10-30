@@ -420,4 +420,131 @@ bool cargarDesdeArchivo(const string &filename) {
         sort(keys.begin(), keys.end());
         for (int k : keys) {
             Monstruo m = tmpMonsters[k];
-            if (m.attack_ran_
+            if (m.attack_range == 0) m.attack_range = 1;
+            if (m.attack_damage == 0) m.attack_damage = 5;
+            if (m.hp == 0) m.hp = 50;
+            if (m.vision_range == 0) m.vision_range = 5;
+            monstruos.push_back(m);
+        }
+    }
+
+    if (heroes.empty()) cerr << "no hay heroes" << endl;
+    if (monstruos.empty()) cerr << "no hay monstruos" << endl;
+
+    return true;
+}
+
+int main(int argc, char** argv) {
+    if (argc < 2) {
+        cout << "Uso: " << argv[0] << " <archivo_config.txt>" << endl;
+        return 1;
+    }
+    string filename = argv[1];
+    if (!cargarDesdeArchivo(filename)) {
+        cout << "cargar denuevo" << endl;
+        return 1;
+    }
+
+    // inicializar mapa
+    mapa.assign(ROWS, vector<int>(COLS, 0));
+    for (auto &h : heroes) {
+        if (h.pos.x >= 0 && h.pos.x < ROWS && h.pos.y >= 0 && h.pos.y < COLS) {
+            mapa[h.pos.x][h.pos.y] = 1;
+        }
+    }
+    for (auto &m : monstruos) {
+        if (m.pos.x >= 0 && m.pos.x < ROWS && m.pos.y >= 0 && m.pos.y < COLS) {
+            if (mapa[m.pos.x][m.pos.y] == 0) mapa[m.pos.x][m.pos.y] = 2;
+        }
+    }
+
+    int H = (int)heroes.size();
+    int M = (int)monstruos.size();
+
+    sem_heroes.assign(H, {});
+    sem_monstruos.assign(M, {});
+    for (int i = 0; i < H; ++i) sem_init(&sem_heroes[i], 0, 0);
+    for (int i = 0; i < M; ++i) sem_init(&sem_monstruos[i], 0, 0);
+
+    sem_init(&sem_heroes_done, 0, 0);
+    sem_init(&sem_monsters_done, 0, 0);
+
+    vector<pthread_t> th_heroes(H);
+    vector<pthread_t> th_monsters(M);
+    vector<int> idsH(H), idsM(M);
+    for (int i = 0; i < H; ++i) idsH[i] = i;
+    for (int i = 0; i < M; ++i) idsM[i] = i;
+
+    for (int i = 0; i < H; ++i) pthread_create(&th_heroes[i], nullptr, hiloHeroe, &idsH[i]);
+    for (int i = 0; i < M; ++i) pthread_create(&th_monsters[i], nullptr, hiloMonstruo, &idsM[i]);
+
+    while (juego_activo) {
+        imprimirMapaEnArchivoYConsola();
+
+        cout << "Presiona 'n' + Enter para siguiente turno (q para salir): ";
+        string aux;
+        cin >> aux;
+
+        if (aux == "q") { juego_activo = false; break; }
+        if (aux != "n") continue;
+        // si es "n" seguimos con el turno
+
+        // turno héroes
+        for (int i = 0; i < H; ++i) {
+            if (heroes[i].alive && !heroes[i].reached_goal)
+                sem_post(&sem_heroes[i]);
+            else
+                sem_post(&sem_heroes_done);
+        }
+        for (int i = 0; i < H; ++i) sem_wait(&sem_heroes_done);
+
+        imprimirMapaEnArchivoYConsola();
+
+        // turno monstruos
+        for (int i = 0; i < M; ++i) {
+            if (monstruos[i].alive)
+                sem_post(&sem_monstruos[i]);
+            else
+                sem_post(&sem_monsters_done);
+        }
+        for (int i = 0; i < M; ++i) sem_wait(&sem_monsters_done);
+
+        imprimirMapaEnArchivoYConsola();
+
+        bool anyHeroAlive = false;
+        bool allReached = true;
+        for (auto &h : heroes) {
+            if (h.alive) anyHeroAlive = true;
+            if (!h.reached_goal) allReached = false;
+        }
+        if (!anyHeroAlive) {
+            cout << "todos murieron" << endl;
+            juego_activo = false;
+            break;
+        }
+        if (allReached) {
+            cout << "todos llegaron" << endl;
+            juego_activo = false;
+            break;
+        }
+        usleep(100000);
+    }
+
+    // Despertar threads para que salgan si están esperando
+    for (int i = 0; i < H; ++i) sem_post(&sem_heroes[i]);
+    for (int i = 0; i < M; ++i) sem_post(&sem_monstruos[i]);
+
+    for (int i = 0; i < H; ++i) pthread_join(th_heroes[i], nullptr);
+    for (int i = 0; i < M; ++i) pthread_join(th_monsters[i], nullptr);
+
+    imprimirMapaEnArchivoYConsola();
+
+    for (int i = 0; i < H; ++i) sem_destroy(&sem_heroes[i]);
+    for (int i = 0; i < M; ++i) sem_destroy(&sem_monstruos[i]);
+    sem_destroy(&sem_heroes_done);
+    sem_destroy(&sem_monsters_done);
+    pthread_mutex_destroy(&mtx);
+
+    cout << "final" << endl;
+    return 0;
+}
