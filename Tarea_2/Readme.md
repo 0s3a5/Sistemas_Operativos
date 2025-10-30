@@ -63,3 +63,21 @@ ahora el heroe y monstruos se manejan como threads
 cambios a realizar
 -hacer que funcione con mas de un heroe
 -hacer que se le pueda meter un archivo 
+
+
+*30/10/25 update_prueba v3.0 15:56
+
+creo que esta listo 
+para usarlo deben estar los archivos creados
+en la misma carpeta de donde estan los archivos .txt debe estar el .cpp
+se crea igual que el anterior 
+en la carpeta se deja
+sudo touch juego.cpp
+sudo nano touch.cpp
+se copia el codigo de prueba_update
+y sepues ctrl+x
+
+ se pone 
+ g++ -std=c++17 -pthread juego.cpp -o juego
+
+./juego ejemplo2.txt
