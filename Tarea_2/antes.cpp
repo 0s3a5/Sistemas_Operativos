@@ -25,6 +25,8 @@ struct Monstruo {
     bool active = false;
     bool alive = true;
 };
+int ROWS=10;
+int COLS=10;
 vector<vector<int>> mapa; 
 vector<Heroe> heroes;
 vector<Monstruo> monstruos;
