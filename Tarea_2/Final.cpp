@@ -134,56 +134,73 @@ bool alerta_global = false;
 
 void comprobarVisionYAccionarMonstruo(int midx) {
     Monstruo &m = monstruos[midx];
-    int best = -1;//heroe mas cercano
+
+    if (!m.alive) return;
+
+    int best = -1;  //indicadoe de mas cercano
     int bestd = INT_MAX;
-    pthread_mutex_lock(&mtx);
+
+    pthread_mutex_lock(&mtx);//se bloquea mapa
     for (size_t i = 0; i < heroes.size(); ++i) {
         if (!heroes[i].alive) continue;
-        int d = distanciaManhattan(m.pos, heroes[i].pos);
-        if (d < bestd) { bestd = d; best = (int)i; }
+        int d = distanciaManhattan(m.pos, heroes[i].pos);//se ocupa manhatan
+        if (d < bestd) {
+            bestd = d;
+            best = (int)i;
+        }
     }
-    pthread_mutex_unlock(&mtx);
-    if (best == -1) return; // no hay heroes vivos
-    if (bestd <= m.vision_range) {
-        pthread_mutex_lock(&mtx);//si detecta monstruo se activan todos
-        alerta_global = true;
+    pthread_mutex_unlock(&mtx);//se desbloquea mapa
+
+    if (best == -1) return; // si no hay heroes cerca
+
+    if (bestd <= m.vision_range) {//heroe en rango de vision
+        pthread_mutex_lock(&mtx);//bloquea mapa
         if (!m.active) {
             m.active = true;
-            cout << "monstruo" << m.id << " vio al heroe en (dist=" << bestd << ")"<<endl;
+            cout << "monstruo" << m.id << " vio al heroe en dist=" << bestd << "" << endl;
         }
-        pthread_mutex_unlock(&mtx);
+        for (auto &other : monstruos) {
+            if (!other.alive) continue;
+            if (other.active) continue;
+            int distToHero = distanciaManhattan(other.pos, heroes[best].pos);//se activan los monstruos cercanos
+            if (distToHero <= other.vision_range) {
+                other.active = true;
+                cout << "monstruo" << other.id << " también entra en alerta ve al héroe a distancia" 
+                     << distToHero << endl;
+            }
+        }
+        pthread_mutex_unlock(&mtx);//se libera mapa
     }
-    if (alerta_global) {
-        pthread_mutex_lock(&mtx);
-        m.active = true;
-        pthread_mutex_unlock(&mtx);
-    } else {
-        return; 
-    }
-    pthread_mutex_lock(&mtx);
+    if (!m.active) return;
+    pthread_mutex_lock(&mtx);//se bloquea mapa si hay monstruo actico
     Heroe &target = heroes[best];
-    if (bestd <= m.attack_range && target.alive) { //si esta en rango ataca
-        target.hp -= m.attack_damage;
-        cout << "monstruo" << m.id << " ataca a heroe" << target.id << " (-" << m.attack_damage << " HP). restante " << max(0, target.hp) << "\n";
-        if (target.hp <= 0) {//si muere heore
+    int dist = distanciaManhattan(m.pos, target.pos);//se ocupa manhatan
+    if (dist <= m.attack_range && target.alive) {
+        target.hp -= m.attack_damage;//resta el daño a heroe
+        cout << "monstruo" << m.id << " ataca a heroe" << target.id
+             << " (-" << m.attack_damage << " HP). restante " << max(0, target.hp) << endl;
+        if (target.hp <= 0) {//verificacion heroe muerto
             target.alive = false;
-            if (target.pos.x >= 0 && target.pos.x < ROWS && target.pos.y >= 0 && target.pos.y < COLS)
-                mapa[target.pos.x][target.pos.y] = 0;//se cambia casilla a vacia
-            cout << "heroe " << target.id << " murio "<<endl;
+            if (target.pos.x >= 0 && target.pos.x < ROWS && target.pos.y >= 0 && target.pos.y < COLS)//dentro de limites
+                mapa[target.pos.x][target.pos.y] = 0;
+            cout << "heroe " << target.id << " murio " << endl;
         }
-        pthread_mutex_unlock(&mtx);
+        pthread_mutex_unlock(&mtx);//se libera mapa
         return;
     }
-    pthread_mutex_unlock(&mtx);// se mueve una casilla hacia el heroe si no esta en rango de ataque
-    int dx = heroes[best].pos.x - m.pos.x;
+    pthread_mutex_unlock(&mtx); //se libersa mapa
+    int dx = heroes[best].pos.x - m.pos.x;//se guarda proxima posicion para mover
     int dy = heroes[best].pos.y - m.pos.y;
-    if (abs(dx) > abs(dy)) m.pos.x += (dx > 0 ? 1 : -1);
-    else if (dy != 0) m.pos.y += (dy > 0 ? 1 : -1);
 
-    pthread_mutex_lock(&mtx);
+    if (abs(dx) > abs(dy))
+        m.pos.x += (dx > 0 ? 1 : -1);//se cambia de posicion
+    else if (dy != 0)
+        m.pos.y += (dy > 0 ? 1 : -1);
+
+    pthread_mutex_lock(&mtx);//se bloquea mapa
     if (m.pos.x >= 0 && m.pos.x < ROWS && m.pos.y >= 0 && m.pos.y < COLS)
-        mapa[m.pos.x][m.pos.y] = 2;
-    pthread_mutex_unlock(&mtx);
+        mapa[m.pos.x][m.pos.y] = 2;//se cambia en el mapa
+    pthread_mutex_unlock(&mtx);//se libera mapa
 }
 
 void* hiloHeroe(void* arg) {
