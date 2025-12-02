@@ -3,7 +3,7 @@
 #include <chrono>
 #include <thread>
 #include <algorithm> // Necesario para remove
-#include "simulador.h"
+#include "tarea.h"
 
 using namespace std; // Aplicado globalmente
 
