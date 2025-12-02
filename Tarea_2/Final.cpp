@@ -61,7 +61,7 @@ void imprimirMapaEnArchivoYConsola() {
         cout << endl;
     }
     cout << endl;
-    // Stats
+
     for (auto &h : heroes) {
         ss << "heroe" << h.id << " HP=" << h.hp << " posicion=(" << h.pos.x << "," << h.pos.y << ")"
            << (h.alive ? "" : " muerto") << (h.reached_goal ? " llego" : "") << "\n";
@@ -75,10 +75,6 @@ void imprimirMapaEnArchivoYConsola() {
      cout << ss.str();
     pthread_mutex_unlock(&mtx);
 }
-
-// -----------------------------
-// Movimiento y ataques
-// -----------------------------
 void moverHeroeIndice(int idx) {
     Heroe &h = heroes[idx];
     pthread_mutex_lock(&mtx);
