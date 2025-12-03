@@ -270,7 +270,7 @@ bool MemoryManager::access_page(vector<Process> &processes, Process &proc, int p
 // ==========================================
 
 int main() {
-    cout << "Simulador de paginacion (Version Final Integrada)\n\n";
+    cout << "trabajo final final ";
 
     double mem_fisica_mb, tam_pagina_kb;
 
@@ -284,14 +284,14 @@ int main() {
     // Minimo: 1 MB (1024 KB)
     // Maximo: 30% de la Memoria Fisica
     int min_proc_kb = 1024; 
-    int max_proc_kb = (int)((mem_fisica_mb * 1024.0) * 0.30);
+    int max_proc_kb = (int)((mem_fisica_mb * 1024.0) * 0.50);
     
     // Seguridad por si la memoria es muy chica
     if (max_proc_kb < min_proc_kb) max_proc_kb = min_proc_kb;
 
-    cout << "\n[CONFIG] Rango de procesos automatico (Estilo Trabajo A):\n";
+   cout <<"rangos"<<endl;
     cout << "   Minimo: " << min_proc_kb << " KB\n";
-    cout << "   Maximo: " << max_proc_kb << " KB (30% de RAM)\n";
+    cout << "   Maximo: " << max_proc_kb << " KB (50% de RAM)\n";
 
     random_device rd;
     mt19937 gen(rd());
