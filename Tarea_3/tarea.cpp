@@ -282,7 +282,7 @@ int main() {
 
     // --- LOGICA TRABAJO A: Rango calculado automáticamente ---
     // Minimo: 1 MB (1024 KB)
-    // Maximo: 30% de la Memoria Fisica
+    // Maximo: 50% de la Memoria Fisica
     int min_proc_kb = 1024; 
     int max_proc_kb = (int)((mem_fisica_mb * 1024.0) * 0.50);
     
