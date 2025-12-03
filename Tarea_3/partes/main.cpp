@@ -20,9 +20,9 @@ int main() {
     int max_proc = (int)((ram_mb * 1024.0) * 0.50);
     if (max_proc < min_proc) max_proc = min_proc;
 
-    cout << "\n[CONFIG] Rango procesos (Automatico):\n";
-    cout << "   Minimo: " << min_proc << " KB\n";
-    cout << "   Maximo: " << max_proc << " KB\n";
+    cout << "Rango procesos "<<endl;
+    cout << "   Minimo: " << min_proc << " KB"<<endl;
+    cout << "   Maximo: " << max_proc << " KB"<<endl;
 
     random_device rd;
     mt19937 gen(rd());
@@ -31,16 +31,16 @@ int main() {
     double factor = dist_factor(gen);
     double vir_mb = ram_mb * factor;
 
-    cout << "\n[INFO] Fisica: " << ram_mb << " MB\n";
-    cout << "[INFO] Virtual: " << vir_mb << " MB (x" << factor << ")\n";
+    cout << "memroia fisica: " << ram_mb << " MB"<<endl;
+    cout << "memoria virtual: " << vir_mb << " MB (x" << factor << ")"<<endl;
 
     int marcos_ram = (ram_mb * 1024.0) / pag_kb;
     int marcos_vir = (vir_mb * 1024.0) / pag_kb;
     int marcos_swap = marcos_vir - marcos_ram;
     if (marcos_swap < 0) marcos_swap = 0;
 
-    cout << "[INFO] Marcos RAM: " << marcos_ram << "\n";
-    cout << "[INFO] Marcos SWAP: " << marcos_swap << "\n\n";
+    cout << "marcos ram " << marcos_ram << endl;
+    cout << "marcos swap " << marcos_swap << endl;
 
     GestorMem mem(pag_kb, marcos_ram, marcos_swap);
     vector<Proceso> lista_procs;
@@ -52,7 +52,7 @@ int main() {
 
     uniform_int_distribution<int> dist_tam(min_proc, max_proc);
 
-    cout << "[START] Iniciando...\n";
+    cout << "inicio de simualcion";
 
     while (true) {
         auto ahora = chrono::steady_clock::now();
@@ -90,7 +90,7 @@ int main() {
                 int pag = r_pag(gen);
 
                 if (!mem.acceder(lista_procs, p, pag)) {
-                    cout << "[FIN] Error critico swap.\n";
+                    cout << "termino por error en swap"<<endl;
                     break;
                 }
                 mem.estado(); 
@@ -98,7 +98,7 @@ int main() {
         }
 
         if (mem.libres_ram() == 0 && mem.libres_swap() == 0) {
-            cout << "\n[FIN] Memoria colapsada.\n";
+            cout << "termino por memoria llena"<<endl;
             break;
         }
 
