@@ -315,13 +315,11 @@ cout << "marcos de ram " << marcos_ram << endl;
             }
         }
 
-        // Verificación final de colapso
         if (mem.libres_ram() == 0 && mem.libres_swap() == 0) {
             cout << "memorias llenas"<< endl;
             break;
         }
 
-        // Pausa breve para no saturar CPU
         this_thread::sleep_for(chrono::milliseconds(200));
     }
 
