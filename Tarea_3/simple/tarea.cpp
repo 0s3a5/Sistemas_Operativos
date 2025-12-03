@@ -85,7 +85,7 @@ bool GestorMem::asignar(Proceso &p) {
         } else {
             int m_swap = buscar_swap();
             if (m_swap == -1) {
-                cout << "[ERROR] Memoria LLENA. PID=" << p.pid << " rechazado.\n";
+                cout << "memoria lleba pid" << p.pid << " rechazado"<<endl;
                 return false;
             }
             swap[m_swap] = {true, p.pid, p.pags[i].id_pag};
@@ -224,7 +224,7 @@ int main() {
             Proceso nuevo(contador_pid++, tam, pag_kb);
 
             if (!mem.asignar(nuevo)) {
-                cout << "[FIN] Memoria llena.\n";
+                cout << "Memoria llena no se puden hacer mas procesos"<<endl;
                 break;
             }
             lista_procs.push_back(nuevo);
