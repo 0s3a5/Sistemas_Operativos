@@ -42,6 +42,6 @@ en este codigo esta el bucle principal que cada 2 segundos crea un proceso
 pasado lo s 30 empieza a cada 5 segundos liberar un proceso y acceder a memoria
 todo esto mientras sigue creando procesos
 cada proceso que se crea esta definido entre un tamaño minimo de 1mb para que sea rapido
-pero no puede sobrepasar mas de la mitad del tamaño de la memoria fisica
-
+pero no puede sobrepasar mas del 30% del tamaño de la memoria fisica
+este cambio lo hice porque de verdad dura muy poco con el limite de 50
 y ya eso es todo
