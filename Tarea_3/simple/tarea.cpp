@@ -178,7 +178,7 @@ int main() {
     cout << "ingrese tamanñ Pagina (KB) "<<endl;
     if (!(cin >> pag_kb) || pag_kb <= 0) return 1;
     int min_proc = 1024; 
-    int max_proc = (int)((ram_mb * 1024.0) * 0.50); 
+    int max_proc = (int)((ram_mb * 1024.0) * 0.30); 
     if (max_proc < min_proc) max_proc = min_proc;
 
     cout << "rangos de procesos"<< endl;
