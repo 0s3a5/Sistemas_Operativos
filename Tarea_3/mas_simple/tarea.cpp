@@ -15,7 +15,7 @@ struct InfoPag {
     int marco_ram;   
     bool en_swap;  
     int idx_swap;    
-
+};
 class Proceso {
 public:
     int pid;                 
