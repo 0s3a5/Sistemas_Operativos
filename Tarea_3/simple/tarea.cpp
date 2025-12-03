@@ -3,386 +3,266 @@
 #include <chrono>
 #include <thread>
 #include <algorithm>
-#include <iomanip> // Para std::setprecision
+#include <iomanip> 
 #include "tarea.h"
-
 using namespace std;
 
-// ==========================================
-// IMPLEMENTACIÓN DE PROCESS
-// ==========================================
+Proceso::Proceso(int id, int tam, int tam_pag)
+    : pid(id), tam_kb(tam) {
 
-Process::Process(int pid_, int size_kb_, int page_size_kb)
-    : pid(pid_), size_kb(size_kb_) {
+    if (tam_pag <= 0) tam_pag = 1;
+    if (tam_kb <= 0) tam_kb = tam_pag;
 
-    if (page_size_kb <= 0) page_size_kb = 1;
-    if (size_kb <= 0) size_kb = page_size_kb;
+    num_pags = (tam_kb + tam_pag - 1) / tam_pag;
+    if (num_pags <= 0) num_pags = 1;
 
-    num_pages = (size_kb + page_size_kb - 1) / page_size_kb;
-    if (num_pages <= 0) num_pages = 1;
+    pags.reserve(num_pags);
 
-    pages.clear();
-    pages.reserve(num_pages);
-
-    for (int i = 0; i < num_pages; ++i) {
-        PageInfo p;
-        p.page_number = i;
-        p.in_ram = false;
-        p.frame_index = -1;
-        p.in_swap = false;
-        p.swap_index = -1;
-        pages.push_back(p);
+    for (int i = 0; i < num_pags; ++i) {
+        InfoPag p;
+        p.id_pag = i;
+        p.en_ram = false;
+        p.marco_ram = -1;
+        p.en_swap = false;
+        p.idx_swap = -1;
+        pags.push_back(p);
     }
 }
+GestorMem::GestorMem(int tam_p, int t_ram, int t_swap)
+    : tam_pag(tam_p), total_ram(t_ram), total_swap(t_swap) {
 
-// ==========================================
-// IMPLEMENTACIÓN DE MEMORY
-// ==========================================
-
-MemoryManager::MemoryManager(int page_size_kb_, int frames_ram_, int frames_swap_)
-    : page_size_kb(page_size_kb_),
-      frames_ram(frames_ram_),
-      frames_swap(frames_swap_) {
-
-    ram.resize(frames_ram);
-    swap.resize(frames_swap);
-
-    for (int i = 0; i < frames_ram; ++i) {
-        ram[i].used = false;
-        ram[i].pid = -1;
-        ram[i].page_number = -1;
-        ram[i].is_swap = false;
-    }
-
-    for (int i = 0; i < frames_swap; ++i) {
-        swap[i].used = false;
-        swap[i].pid = -1;
-        swap[i].page_number = -1;
-        swap[i].is_swap = true;
-    }
+    ram.resize(total_ram, {false, -1, -1});
+    swap.resize(total_swap, {false, -1, -1});
 }
 
-int MemoryManager::find_free_ram_frame() const {
-    for (int i = 0; i < frames_ram; ++i) {
-        if (!ram[i].used) return i;
-    }
+int GestorMem::buscar_ram() const {
+    for (int i = 0; i < total_ram; ++i) if (!ram[i].uso) return i;
     return -1;
 }
 
-int MemoryManager::find_free_swap_frame() const {
-    for (int i = 0; i < frames_swap; ++i) {
-        if (!swap[i].used) return i;
-    }
+int GestorMem::buscar_swap() const {
+    for (int i = 0; i < total_swap; ++i) if (!swap[i].uso) return i;
     return -1;
 }
 
-int MemoryManager::free_ram_frames() const {
-    int count = 0;
-    for (const auto &f : ram) if (!f.used) ++count;
-    return count;
+int GestorMem::libres_ram() const {
+    int c = 0;
+    for (const auto &m : ram) if (!m.uso) c++;
+    return c;
 }
 
-int MemoryManager::free_swap_frames() const {
-    int count = 0;
-    for (const auto &f : swap) if (!f.used) ++count;
-    return count;
+int GestorMem::libres_swap() const {
+    int c = 0;
+    for (const auto &m : swap) if (!m.uso) c++;
+    return c;
 }
 
-// --- NUEVO: Función visual de estado (Estilo Trabajo A) ---
-void MemoryManager::print_status() const {
-    int ram_ocupada = frames_ram - free_ram_frames();
-    int swap_ocupada = frames_swap - free_swap_frames();
+void GestorMem::estado() const {
+    int oc_ram = total_ram - libres_ram();
+    int oc_swap = total_swap - libres_swap();
+    
+    double p_ram = (double)oc_ram / total_ram * 100.0;
+    double p_swap = (total_swap > 0) ? ((double)oc_swap / total_swap * 100.0) : 0.0;
 
-    double ram_pct = (double)ram_ocupada / frames_ram * 100.0;
-    double swap_pct = (frames_swap > 0) ? ((double)swap_ocupada / frames_swap * 100.0) : 0.0;
-
-    cout << "   [ESTADO] RAM: " << ram_ocupada << "/" << frames_ram 
-         << " (" << fixed << setprecision(1) << ram_pct << "%)"
-         << " | SWAP: " << swap_ocupada << "/" << frames_swap 
-         << " (" << fixed << setprecision(1) << swap_pct << "%)\n";
+    cout << "  ram " << oc_ram << "/" << total_ram 
+         << " (" << fixed << setprecision(1) << p_ram << "%)"
+         << " | swap  " << oc_swap << "/" << total_swap 
+         << " (" << fixed << setprecision(1) << p_swap << "%)"<< endl;
 }
 
-bool MemoryManager::allocate_process(Process &proc) {
-    cout << "\n[CREAR] PID=" << proc.pid
-         << " (" << proc.size_kb << " KB, " << proc.num_pages << " pgs)\n";
+bool GestorMem::asignar(Proceso &p) {
+    cout << "creacion de nuevo pid" << p.pid << " (" << p.tam_kb << " KB " << p.num_pags << " paginas)"<<endl;
 
-    for (int i = 0; i < proc.num_pages; ++i) {
-        int frame = find_free_ram_frame();
+    for (int i = 0; i < p.num_pags; ++i) {
+        int m_ram = buscar_ram();
         
-        if (frame != -1) {
-            ram[frame].used = true;
-            ram[frame].pid = proc.pid;
-            ram[frame].page_number = proc.pages[i].page_number;
-            ram[frame].is_swap = false;
-
-            proc.pages[i].in_ram = true;
-            proc.pages[i].frame_index = frame;
-            proc.pages[i].in_swap = false;
-            proc.pages[i].swap_index = -1;
-
-            fifo_order.erase(remove(fifo_order.begin(), fifo_order.end(), frame), fifo_order.end());
-            fifo_order.push_back(frame);
-
+        if (m_ram != -1) {
+            ram[m_ram] = {true, p.pid, p.pags[i].id_pag};
+            p.pags[i] = {p.pags[i].id_pag, true, m_ram, false, -1};
+            
+            cola_fifo.erase(remove(cola_fifo.begin(), cola_fifo.end(), m_ram), cola_fifo.end());
+            cola_fifo.push_back(m_ram);
         } else {
-            int sframe = find_free_swap_frame();
-            if (sframe == -1) {
-                cout << "[ERROR] RAM y SWAP llenos. PID=" << proc.pid << " rechazado.\n";
+            int m_swap = buscar_swap();
+            if (m_swap == -1) {
+                cout << "[ERROR] Memoria LLENA. PID=" << p.pid << " rechazado.\n";
                 return false;
             }
-            swap[sframe].used = true;
-            swap[sframe].pid = proc.pid;
-            swap[sframe].page_number = proc.pages[i].page_number;
-            swap[sframe].is_swap = true;
-
-            proc.pages[i].in_ram = false;
-            proc.pages[i].frame_index = -1;
-            proc.pages[i].in_swap = true;
-            proc.pages[i].swap_index = sframe;
+            swap[m_swap] = {true, p.pid, p.pags[i].id_pag};
+            p.pags[i] = {p.pags[i].id_pag, false, -1, true, m_swap};
         }
     }
     return true;
 }
 
-void MemoryManager::free_process(const Process &proc) {
-    cout << "\n[KILL] Finalizando PID=" << proc.pid << " (Liberando memoria...)\n";
+void GestorMem::liberar(const Proceso &p) {
+    cout << "matar proceso (pid)" << p.pid << endl;
 
-    for (int i = 0; i < frames_ram; ++i) {
-        if (ram[i].used && ram[i].pid == proc.pid) {
-            ram[i].used = false;
-            ram[i].pid = -1;
-            ram[i].page_number = -1;
-            fifo_order.erase(remove(fifo_order.begin(), fifo_order.end(), i), fifo_order.end());
+    for (int i = 0; i < total_ram; ++i) {
+        if (ram[i].uso && ram[i].pid == p.pid) {
+            ram[i] = {false, -1, -1};
+            cola_fifo.erase(remove(cola_fifo.begin(), cola_fifo.end(), i), cola_fifo.end());
         }
     }
-
-    for (int i = 0; i < frames_swap; ++i) {
-        if (swap[i].used && swap[i].pid == proc.pid) {
-            swap[i].used = false;
-            swap[i].pid = -1;
-            swap[i].page_number = -1;
+    for (int i = 0; i < total_swap; ++i) {
+        if (swap[i].uso && swap[i].pid == p.pid) {
+            swap[i] = {false, -1, -1};
         }
     }
 }
 
-bool MemoryManager::access_page(vector<Process> &processes, Process &proc, int page_index, bool verbose) {
-    if (page_index < 0 || page_index >= proc.num_pages) return false;
+bool GestorMem::acceder(vector<Proceso> &procs, Proceso &p, int n_pag) {
+    if (n_pag < 0 || n_pag >= p.num_pags) return false;
+    InfoPag &pag = p.pags[n_pag];
 
-    PageInfo &page = proc.pages[page_index];
-
-    if (page.in_ram) {
-        if (verbose) {
-            cout << "[ACCESO] HIT! PID=" << proc.pid << " Pag=" << page.page_number
-                 << " en RAM Frame " << page.frame_index << "\n";
-        }
+    if (pag.en_ram) {
+        cout << "acceso a pid" << p.pid << " Pag=" << n_pag << " en Marco " << pag.marco_ram << endl;
         return true;
     }
+        if (!pag.en_swap) return false; 
+    cout << "ocurrio un page fault" << p.pid << " pagina " << n_pag << " esta en swap"<<endl;
 
-    if (!page.in_swap) return false;
+    int destino = buscar_ram();
+    if (destino == -1) {
+        if (cola_fifo.empty()) return false;
+        int victima_idx = cola_fifo.front();
+        cola_fifo.pop_front();
+        cola_fifo.erase(remove(cola_fifo.begin(), cola_fifo.end(), victima_idx), cola_fifo.end());
 
-    if (verbose) {
-        cout << "[ACCESO] PAGE FAULT! PID=" << proc.pid << " Pag=" << page.page_number << " esta en SWAP.\n";
-    }
-
-    int free_frame = find_free_ram_frame();
-
-    if (free_frame == -1) {
-        if (fifo_order.empty()) return false;
-
-        int victim_frame = fifo_order.front();
-        fifo_order.pop_front();
-        fifo_order.erase(remove(fifo_order.begin(), fifo_order.end(), victim_frame), fifo_order.end());
-
-        Frame &vict = ram[victim_frame];
-
-        Process *vict_proc = nullptr;
-        for (auto &p : processes) {
-            if (p.pid == vict.pid) {
-                vict_proc = &p;
-                break;
-            }
+        Marco &m_victima = ram[victima_idx];
+        Proceso *proc_v = nullptr;
+        for (auto &pr : procs) {
+            if (pr.pid == m_victima.pid) { proc_v = &pr; break; }
         }
+        if (!proc_v) return false;
 
-        if (!vict_proc) return false;
-
-        int vict_idx = -1;
-        for (int i = 0; i < vict_proc->num_pages; i++) {
-            if (vict_proc->pages[i].page_number == vict.page_number) {
-                vict_idx = i;
-                break;
-            }
+        int idx_pag_v = -1;
+        for (int i = 0; i < proc_v->num_pags; i++) {
+            if (proc_v->pags[i].id_pag == m_victima.id_pag) { idx_pag_v = i; break; }
         }
-        if (vict_idx == -1) return false;
+        if (idx_pag_v == -1) return false;
 
-        int swap_slot = find_free_swap_frame();
-        if (swap_slot == -1) {
-            cout << "[ERROR] Swap lleno. No se puede reemplazar.\n";
+        int m_swap = buscar_swap();
+        if (m_swap == -1) {
+            cout << "swap lleno, no se puede reemplazar"<<endl;
             return false;
         }
 
-        swap[swap_slot].used = true;
-        swap[swap_slot].pid = vict.pid;
-        swap[swap_slot].page_number = vict.page_number;
+        swap[m_swap] = {true, m_victima.pid, m_victima.id_pag};
+        proc_v->pags[idx_pag_v] = {m_victima.id_pag, false, -1, true, m_swap};
 
-        vict_proc->pages[vict_idx].in_ram = false;
-        vict_proc->pages[vict_idx].frame_index = -1;
-        vict_proc->pages[vict_idx].in_swap = true;
-        vict_proc->pages[vict_idx].swap_index = swap_slot;
-
-        ram[victim_frame].used = false;
-        ram[victim_frame].pid = -1;
-        ram[victim_frame].page_number = -1;
-
-        free_frame = victim_frame;
-
-        if (verbose) {
-            cout << "   -> [FIFO SWAP OUT] Victima PID=" << vict.pid 
-                 << " movida a SWAP Slot " << swap_slot << "\n";
-        }
+        cout << "   cambio mediante fifo se reemplaza" << m_victima.pid << " a Swap " << m_swap << endl;
+                ram[victima_idx] = {false, -1, -1};
+        destino = victima_idx;
     }
 
-    Frame &sw_slot = swap[page.swap_index];
-    sw_slot.used = false;
-    sw_slot.pid = -1;
-    sw_slot.page_number = -1;
+    swap[pag.idx_swap] = {false, -1, -1}; 
+    
+    ram[destino] = {true, p.pid, n_pag};  
+    pag = {n_pag, true, destino, false, -1}; 
+    cola_fifo.erase(remove(cola_fifo.begin(), cola_fifo.end(), destino), cola_fifo.end());
+    cola_fifo.push_back(destino);
 
-    Frame &rf = ram[free_frame];
-    rf.used = true;
-    rf.pid = proc.pid;
-    rf.page_number = page.page_number;
-
-    page.in_ram = true;
-    page.frame_index = free_frame;
-    page.in_swap = false;
-    page.swap_index = -1;
-
-    fifo_order.erase(remove(fifo_order.begin(), fifo_order.end(), free_frame), fifo_order.end());
-    fifo_order.push_back(free_frame);
-
-    if (verbose) {
-        cout << "   -> [SWAP IN] Pagina cargada a RAM Frame " << free_frame << "\n";
-    }
-
+    cout << "  se logro cambiar a ram con el marco " << destino << endl;
     return true;
 }
 
-// ==========================================
-// PROGRAMA PRINCIPAL
-// ==========================================
-
 int main() {
-    cout << "trabajo final final ";
+    cout << "inicio simulacion"<<endl;
 
-    double mem_fisica_mb, tam_pagina_kb;
+    double ram_mb, pag_kb;
 
-    cout << "Ingrese tamano de memoria fisica (MB): ";
-    if (!(cin >> mem_fisica_mb) || mem_fisica_mb <= 0) return 1;
+    cout << "ingrese memoria fisica (MB)"<<endl;
+    if (!(cin >> ram_mb) || ram_mb <= 0) return 1;
 
-    cout << "Ingrese tamano de pagina (KB): ";
-    if (!(cin >> tam_pagina_kb) || tam_pagina_kb <= 0) return 1;
+    cout << "ingrese tamanñ Pagina (KB) "<<endl;
+    if (!(cin >> pag_kb) || pag_kb <= 0) return 1;
+    int min_proc = 1024; 
+    int max_proc = (int)((ram_mb * 1024.0) * 0.50); 
+    if (max_proc < min_proc) max_proc = min_proc;
 
-    // --- LOGICA TRABAJO A: Rango calculado automáticamente ---
-    // Minimo: 1 MB (1024 KB)
-    // Maximo: 50% de la Memoria Fisica
-    int min_proc_kb = 1024; 
-    int max_proc_kb = (int)((mem_fisica_mb * 1024.0) * 0.50);
-    
-    // Seguridad por si la memoria es muy chica
-    if (max_proc_kb < min_proc_kb) max_proc_kb = min_proc_kb;
-
-   cout <<"rangos"<<endl;
-    cout << "   Minimo: " << min_proc_kb << " KB\n";
-    cout << "   Maximo: " << max_proc_kb << " KB (50% de RAM)\n";
+    cout << "rangos de procesos"<< endl;
+    cout << "   minimo: " << min_proc << " KB"<<endl;
+    cout << "   maximo: " << max_proc << " KB(ejecucion para que no sea tan rapido ) "<<endl;
 
     random_device rd;
     mt19937 gen(rd());
     uniform_real_distribution<double> dist_factor(1.5, 4.5);
 
     double factor = dist_factor(gen);
-    double mem_virtual_mb = mem_fisica_mb * factor;
+    double vir_mb = ram_mb * factor;
 
-    cout << "\n[INFO] Memoria fisica: " << mem_fisica_mb << " MB\n";
-    cout << "[INFO] Memoria virtual: " << mem_virtual_mb << " MB (factor " << factor << "x)\n";
+    cout << "memoria fisica: " << ram_mb << " MB"<<endl;
+    cout << "memoria virtual: " << vir_mb << " MB (x" << factor << ")"<<endl;
 
-    double mem_fisica_kb = mem_fisica_mb * 1024.0;
-    double mem_virtual_kb = mem_virtual_mb * 1024.0;
+    int marcos_ram = (ram_mb * 1024.0) / pag_kb;
+    int marcos_vir = (vir_mb * 1024.0) / pag_kb;
+    int marcos_swap = marcos_vir - marcos_ram;
+    if (marcos_swap < 0) marcos_swap = 0;
 
-    int frames_ram = mem_fisica_kb / tam_pagina_kb;
-    int frames_virtual = mem_virtual_kb / tam_pagina_kb;
-    int frames_swap = frames_virtual - frames_ram;
+    cout << "marcos de ram " << marcos_ram << endl;
+    cout << "maros de swap " << marcos_swap << endl;
 
-    if (frames_swap < 0) frames_swap = 0;
-
-    cout << "[INFO] Frames RAM: " << frames_ram << "\n";
-    cout << "[INFO] Frames SWAP: " << frames_swap << "\n\n";
-
-    MemoryManager mem(tam_pagina_kb, frames_ram, frames_swap);
-    vector<Process> procesos;
-    int next_pid = 1;
+    GestorMem mem(pag_kb, marcos_ram, marcos_swap);
+    vector<Proceso> lista_procs;
+    int contador_pid = 1;
 
     auto inicio = chrono::steady_clock::now();
-    int ultimo_creado = 0;
-    int ultimo_evento30 = 0;
+    int t_creacion = 0;
+    int t_eventos = 0;
 
-    uniform_int_distribution<int> dist_size(min_proc_kb, max_proc_kb);
+    uniform_int_distribution<int> dist_tam(min_proc, max_proc);
 
-    cout << "[INFO] Iniciando simulacion...\n";
+    cout << "inicio bucles";
 
     while (true) {
         auto ahora = chrono::steady_clock::now();
         int seg = chrono::duration_cast<chrono::seconds>(ahora - inicio).count();
+        if (seg - t_creacion >= 2) {
+            t_creacion = seg;
+            int tam = dist_tam(gen);
+            Proceso nuevo(contador_pid++, tam, pag_kb);
 
-        // 1. Crear proceso (cada 2s)
-        if (seg - ultimo_creado >= 2) {
-            ultimo_creado = seg;
-            int size_kb = dist_size(gen);
-            Process nuevo(next_pid++, size_kb, tam_pagina_kb);
-
-            if (!mem.allocate_process(nuevo)) {
-                cout << "[FIN] Sin espacio critico en memoria.\n";
+            if (!mem.asignar(nuevo)) {
+                cout << "[FIN] Memoria llena.\n";
                 break;
             }
-            procesos.push_back(nuevo);
-            mem.print_status(); // Mostrar estado visual
+            lista_procs.push_back(nuevo);
+            mem.estado(); 
         }
+        if (seg >= 30 && (seg - t_eventos >= 5)) {
+            t_eventos = seg;
 
-        // 2. Eventos periódicos (cada 5s, después del segundo 30)
-        if (seg >= 30 && (seg - ultimo_evento30 >= 5)) {
-            ultimo_evento30 = seg;
-
-            if (!procesos.empty()) {
-                // Matar proceso
-                uniform_int_distribution<int> distP(0, procesos.size() - 1);
-                int idx = distP(gen);
-                Process morir = procesos[idx];
-                mem.free_process(morir);
-                procesos.erase(procesos.begin() + idx);
-                mem.print_status(); // Actualizar estado tras liberar
+            if (!lista_procs.empty()) {
+                uniform_int_distribution<int> r(0, lista_procs.size() - 1);
+                int idx = r(gen);
+                mem.liberar(lista_procs[idx]);
+                lista_procs.erase(lista_procs.begin() + idx);
+                mem.estado(); 
             }
 
-            if (!procesos.empty()) {
-                // Acceder memoria
-                uniform_int_distribution<int> distP2(0, procesos.size() - 1);
-                Process &p = procesos[distP2(gen)];
-                uniform_int_distribution<int> distPage(0, p.num_pages - 1);
-                int pagina = distPage(gen);
+            if (!lista_procs.empty()) {
+                uniform_int_distribution<int> r_proc(0, lista_procs.size() - 1);
+                Proceso &p = lista_procs[r_proc(gen)];
+                
+                uniform_int_distribution<int> r_pag(0, p.num_pags - 1);
+                int pag = r_pag(gen);
 
-                if (!mem.access_page(procesos, p, pagina, true)) {
-                    cout << "[FIN] Error critico en swap.\n";
+                if (!mem.acceder(lista_procs, p, pag)) {
+                    cout << "murio la swap"<< endl;
                     break;
                 }
-                mem.print_status(); // Mostrar si hubo cambios en RAM/Swap
+                mem.estado(); 
             }
         }
 
-        // Fin si todo lleno
-        if (mem.free_ram_frames() == 0 && mem.free_swap_frames() == 0) {
-            cout << "\n[FIN] Memoria completamente llena.\n";
+        if (mem.libres_ram() == 0 && mem.libres_swap() == 0) {
+            cout << "memorias llenas"<< endl;
             break;
         }
 
         this_thread::sleep_for(chrono::milliseconds(200));
     }
 
-    cout << "\nSimulacion terminada.\n";
     return 0;
 }
